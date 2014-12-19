@@ -1,0 +1,7 @@
+#! /bin/bash
+echo $1
+MDOWN=$1
+PDF=${MDOWN/.md/.pdf}
+pandoc -f markdown+lhs -t latex+lhs $MDOWN -o $PDF
+open -F -a Preview $PDF
+exit 0

@@ -1,0 +1,8 @@
+#!/bin/bash
+echo $1
+markdown_in=$1
+pdf_out=${markdown_in/.markdown/.pdf}
+pandoc $markdown_in -o $pdf_out
+open -F -a Preview $pdf_out
+exit 0
+
