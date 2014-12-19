@@ -1,0 +1,4 @@
+#!/usr/bin/env fish
+
+bash -c "$argv[1] > /dev/null 2>&1 &"
+echo "Forking process: "(pgrep -l $argv[1])

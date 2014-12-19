@@ -1,0 +1,7 @@
+#!/usr/bin/env python2
+
+from sys import argv as argv
+
+argv.pop(0)
+
+print raw_input(' '.join(argv) + '\n')
