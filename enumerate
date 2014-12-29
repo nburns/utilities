@@ -1,0 +1,4 @@
+#!/usr/bin/env fish
+for i in (seq (count $argv))
+    echo $i $argv[$i]
+end

@@ -1,0 +1,51 @@
+#!/usr/bin/env python3
+import fileinput
+#name       item name        price       taxrate(optional)
+#everyone   comonitor        34.99
+#everyone   dishdet          -2.00       0.0
+#everyone   dishdet          7.99
+class Item(object):
+    def __init__(self, price=0.0, name='', taxrate=1.09, owner=''):
+        self.taxrate = taxrate
+        self.price = price
+        self.name = name
+        self.owner = owner
+
+    def cost(self):
+        return float(price) * float(taxrate)
+
+def parse_line(line):
+    if line.startswith('#'):
+        return None
+    elif line:
+        items = [i for i in line.split() if i]
+        if len(items) is 3:
+            items.append(1.09)
+
+        return tuple(items)
+
+
+items = []
+for line in fileinput.input():
+    if parse_line(line):
+        owner, name, price, taxrate = parse_line(line)
+        items.append(Item(price=float(price), name=name, owner=owner, taxrate=float(taxrate)))
+
+people = set(list(item.owner for item in items))
+purchases = {name: [] for name in people}
+for item in items:
+    purchases[item.owner].append(item)
+
+for person in purchases:
+    things = purchases[person]
+    print('%s\t%s\t%s' % (person,
+                              str(sum(item.price for item in things)),
+                              str(sum(item.cost() for item in things)),
+                              ))
+
+print('total\t',
+    str(sum(item.price for item in items)),
+    str(sum(item.cost() for item in items))
+    )
+
+

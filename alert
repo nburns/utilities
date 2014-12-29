@@ -1,0 +1,3 @@
+#!/usr/bin/env fish
+osascript -e "tell app \"iTerm2\" to display dialog \"$argv\""
+

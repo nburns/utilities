@@ -5,7 +5,7 @@ import sys
 words_option = ['-w', '--words']
 if sys.argv[1] in words_option:
 	with open('/usr/share/dict/words') as wordlist:
-		words = [line.strip().lower() for line in wordlist]
+		words = {line.strip().lower() for line in wordlist}
 		for perm in permutations(sys.argv[2]):
 			word = ''.join(perm)
 			if word in words:

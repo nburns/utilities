@@ -1,0 +1,2 @@
+#!/usr/bin/env fish
+sox -traw -r44100 -b16 -e unsigned-integer - -tcoreaudio $argv

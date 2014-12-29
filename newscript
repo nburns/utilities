@@ -1,0 +1,9 @@
+#!/usr/bin/env fish
+
+set path $argv[1]
+
+touch $path
+chmod +x $path
+echo '#!/usr/bin/env ' >> $path
+
+vim $path

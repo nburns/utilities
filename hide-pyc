@@ -1,0 +1,4 @@
+#!/usr/bin/env fish
+for f in (find . -iname '*.pyc')
+	setfile -a V $f
+end
