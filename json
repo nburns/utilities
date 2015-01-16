@@ -8,7 +8,13 @@ try:
     pretty = dumps(loads(data), sort_keys=True, indent=4, separators=(',', ': '))
     print(pretty)
 except JSONDecodeError, e:
-    line = data.split('\n')[e.lineno]
+    print()
+    lines = data.split('\n')
+    if isinstance(lines, list):
+        print(len(lines))
+        line = lines[e.lineno]
+    else:
+        line = lines
     error_marker = ''.join(['^' if i == e.colno else '-' for i, c in enumerate(line)])
     print(line)
     print(error_marker)
