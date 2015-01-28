@@ -1,4 +1,3 @@
 #!/usr/bin/env fish
-for f in (find . -iname '*.pyc')
-	setfile -a V $f
-end
+
+find . -iname '*.pyc' | xargs -P 4 -n 1 setfile -a V 

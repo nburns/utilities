@@ -1,0 +1,10 @@
+#!/usr/bin/env fish
+
+for a in $argv
+    echo $a
+    for p in (brew search $a)
+        echo _______ $p _______
+        brew info $p
+        echo
+    end
+end

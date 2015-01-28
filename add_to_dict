@@ -1,0 +1,14 @@
+#!/usr/bin/env fish
+set dict ~/Documents/dictionaries/dictionary.dic
+set tmp (mktemp /tmp/dictXXXXXXXX)
+
+echo $argv >> $dict
+
+mv $dict $tmp
+cat $tmp | sort -f | uniq > $dict
+
+echo $dict
+cat $dict
+
+rm $tmp
+

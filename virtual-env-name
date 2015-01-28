@@ -1,0 +1,6 @@
+#!/usr/bin/env fish
+if set -q VIRTUAL_ENV
+    echo (basename $VIRTUAL_ENV)
+else
+    echo
+end
