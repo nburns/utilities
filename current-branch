@@ -1,2 +1,9 @@
 #!/usr/bin/env fish
-echo -n (git branch 2>/dev/null | grep '*' | tr -d '* \n')
+set branch (git symbolic-ref HEAD 2> /dev/null)
+
+if [ -n "$branch" ]
+    echo -n ' '(basename $branch)' '
+else
+    echo -n ' '
+end
+
