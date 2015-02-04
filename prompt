@@ -1,9 +1,36 @@
 #!/usr/bin/env fish
 set -g -x last_status $status
 
-echo -n (set_color purple)(current-time)\
-" "(set_color blue)(whoami)(set_color white)"@"(set_color cyan)(hostname)\
-" "(set_color red)(virtual-env-name)\
-(set_color yellow)(current-branch)\
-(set_color green)(prompt_pwd)\
-" "(set_color blue)">"" "\
+set ARROW ''
+
+set_color $base0
+set_color -b $base02
+echo -n (current-time)
+
+set_color $base02
+set_color -b $blue
+echo -n $ARROW' '
+
+set_color $base3
+echo -n (whoami)"@"(hostname)' '
+
+set_color $blue
+set_color -b $base0
+echo -n $ARROW
+
+set_color $base03
+echo -n (current-branch)
+
+set_color $base0
+set_color -b $green
+echo -n $ARROW' '
+
+set_color white -o
+set_color -b $green
+echo -n (prompt_pwd)
+
+set_color -b normal
+set_color $green
+echo -n $ARROW' '
+
+set_color normal

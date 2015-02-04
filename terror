@@ -1,0 +1,3 @@
+#!/usr/bin/env fish
+
+tee /dev/fd/2

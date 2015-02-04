@@ -1,2 +1,6 @@
 #!/usr/bin/env fish
-find . -iname '*'$argv[1]'*'
+
+
+set argv[1] '-iname *'$argv[1]'*'
+
+find . $argv
