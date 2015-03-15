@@ -1,6 +1,6 @@
 #!/usr/bin/env fish
 
-set running (vboxmanage list runningvms)
+set running (vboxmanage list runningvms) > /dev/null
 if echo "$running" | grep 'dev'
     # nothing, machine is running
 else
@@ -10,6 +10,4 @@ else
     end
 end
 
-clear
-
-ssh instaedu@local.instaedu.com
+ssh instaedu@local.instaedu.com $argv

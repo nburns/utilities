@@ -1,2 +1,2 @@
 #!/usr/bin/env fish
-/usr/local/Cellar/ruby182/1.8.2_1/bin/ruby182
+/usr/local/Cellar/ruby182/1.8.2_1/bin/ruby182 $argv

@@ -1,0 +1,10 @@
+#!/usr/bin/env python3
+import sys
+from urllib.parse import quote
+
+
+strings = sys.argv[1:] if sys.argv[1:] else sys.stdin.readlines()
+
+for string in strings:
+    print(quote(string))
+

@@ -1,0 +1,16 @@
+#!/usr/bin/env python3
+import sys
+from urllib.parse import unquote
+
+def urldecode(string):
+    unquoted = unquote(string)
+    if string == unquoted:
+        return string
+    else:
+        return urldecode(unquoted)
+
+strings = sys.argv[1:] if sys.argv[1:] else sys.stdin.readlines()
+
+for string in strings:
+    print(urldecode(string))
+
