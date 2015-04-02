@@ -1,7 +1,6 @@
 #!/usr/bin/env fish
 
-set running (vboxmanage list runningvms) > /dev/null
-if echo "$running" | grep 'dev'
+if vboxmanage list runningvms | grep 'dev'
     # nothing, machine is running
 else
     vboxmanage startvm dev --type headless
@@ -10,4 +9,45 @@ else
     end
 end
 
-ssh instaedu@local.instaedu.com $argv
+set setup_command 'cd instaedu; workon instaedu;'
+
+if set -q $argv
+    ssh instaedu@local.instaedu.com
+    exit
+else
+    switch "$argv[1]"
+        case 'lint'
+            set command 'fab sort; fab lint'
+
+        case 'test'
+            if [ (count $argv) = 2 ]
+                set module $argv[2]
+            else
+                set module ''
+            end
+
+            set command './manage.py test --settings=settings_test_postgres --failfast' $module
+
+        case 'restart'
+            set command 'iedu_restart'
+
+        case 'savestate'
+            vboxmanage controlvm dev savestate
+
+        case 'start'
+            exit
+        
+        case '*'
+            set command $argv
+    end
+    
+    set args "$setup_command $command"
+end
+
+
+if set -q $command
+    # nothing to do
+else
+    ssh instaedu@local.instaedu.com $args
+end
+

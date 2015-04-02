@@ -1,0 +1,2 @@
+#!/usr/bin/env fish
+diff --side-by-side --width (tput cols) $argv
