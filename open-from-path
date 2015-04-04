@@ -1,2 +1,2 @@
 #!/usr/bin/env fish
-sh -c 'pwd'
+mvim (which $argv)

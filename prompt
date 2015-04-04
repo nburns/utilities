@@ -27,7 +27,7 @@ echo -n $ARROW' '
 
 set_color white -o
 set_color -b $green
-echo -n (prompt_pwd)
+echo -n (pwd)
 
 set_color -b normal
 set_color $green
