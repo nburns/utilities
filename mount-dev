@@ -1,0 +1,7 @@
+#!/usr/bin/env fish
+if [ -d /Volumes/dev ]
+    echo-error 'dev is already mounted'
+else
+    mkdir /Volumes/dev
+    sshfs dev_sshfs:/home/instaedu /Volumes/dev -o fsname=dev
+end
