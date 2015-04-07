@@ -1,0 +1,7 @@
+#!/usr/bin/env fish
+switch (uname)
+    case 'Darwin'
+        /usr/bin/pbcopy
+    case 'Linux'
+        xsel --clipboard --input
+end
