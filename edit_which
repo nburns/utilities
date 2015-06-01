@@ -1,0 +1,2 @@
+#!/usr/bin/env bash
+$VISUAL $(which $1)
