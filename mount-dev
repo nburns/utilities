@@ -5,3 +5,5 @@ else
     mkdir /Volumes/dev
     sshfs dev_sshfs:/home/instaedu /Volumes/dev -o fsname=dev
 end
+
+echo -e \e]50\;CurrentDir=/Volumes/dev\a
