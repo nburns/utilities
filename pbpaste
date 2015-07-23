@@ -1,7 +1,7 @@
 #!/usr/bin/env fish
 switch (uname)
     case 'Darwin'
-        /usr/bin/pbpaste
+        /usr/bin/pbpaste $argv
     case 'Linux'
-        xsel --clipboard --output
+        xsel --clipboard --output $argv
 end
