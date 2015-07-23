@@ -1,6 +1,3 @@
 #!/usr/bin/env fish
 
-
-
-
 find . -iname '*'$argv'*'
