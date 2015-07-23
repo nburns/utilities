@@ -1,0 +1,24 @@
+#!/usr/bin/env osascript
+
+property appName : "Network Connect"
+
+set vpnhost to "https://vpn.chegg.com"
+set theUsername to do shell script "security find-generic-password -s vpn.chegg.com | grep acct | cut -d'\"' -f4"
+set thePassword to do shell script "security find-generic-password -s vpn.chegg.com -g 2>&1 | grep password: | cut -d'\"' -f2"
+
+tell application "Network Connect"
+	
+	connect to vpnhost
+	delay 2
+	
+	tell application "System Events"
+		
+		set value of text field 1 of group 7 of UI element 1 of scroll area 1 of window appName of application process appName to the theUsername
+		set value of text field 1 of group 10 of UI element 1 of scroll area 1 of window "Network Connect" of application process "Network Connect" of application "System Events" to thePassword
+		click button "Sign In" of group 17 of UI element 1 of scroll area 1 of window "Network Connect" of application process "Network Connect" of application "System Events"
+		
+	end tell
+	
+	
+	
+end tell
