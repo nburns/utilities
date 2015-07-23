@@ -1,0 +1,64 @@
+#!/usr/bin/env python3
+import argparse
+import sys
+
+wrappers = {
+    'brace': ('{', '}'),
+    'bracket': ('[',']'),
+    'paren': ('(',')'),
+    'none': ('', ''),
+}
+
+
+parser = argparse.ArgumentParser(
+    description='Format streams to data-structure literals')
+
+parser.add_argument('--delimiter', '-d',
+                    type=str, default="'",
+                    help="A character that delimits the beginning and end of the string. "
+                         "Default is \' (a single quote)")
+
+parser.add_argument('--separator', '-s',
+                    type=str, default=',\n',
+                    help='A character that separates the delimited strings. '
+                         'Default is ,\\n (a comma followed by a newline)')
+
+parser.add_argument('--wrapper', '-w',
+                    type=str, default='none',
+                    choices=wrappers.keys(),
+                    help='Characters to prepend and append to the result. '
+                         'By default there is no wrapper')
+
+def main():
+    args = parser.parse_args()
+
+    def delimit(string):
+        return '{}{}{}'.format(args.delimiter, string, args.delimiter)
+
+    def seperate(lines):
+        return args.separator.join([delimit(line) for line in lines])
+
+    def get_output(lines):
+        before, after = wrappers[args.wrapper]
+        return before + seperate(lines) + after
+
+    lines = [l.strip('\n') for l in sys.stdin.readlines()]
+
+    sys.stdout.write(get_output(lines))
+    sys.stdout.write('\n')
+
+
+    
+
+
+
+if __name__ == '__main__':
+    main()
+
+
+
+
+
+
+
+
