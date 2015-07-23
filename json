@@ -2,23 +2,35 @@
 from __future__ import print_function
 import sys
 from simplejson import loads, dumps, JSONDecodeError
+from functools import partial
 
-data = sys.stdin.read()
-try:
-    pretty = dumps(loads(data), sort_keys=True, indent=4, separators=(',', ': '))
-    print(pretty)
-except JSONDecodeError, e:
-    print()
-    lines = data.split('\n')
-    if isinstance(lines, list):
-        print(len(lines))
-        line = lines[e.lineno]
+stderr = partial(print, file=sys.stderr)
+
+
+def error_print(data, error):
+    stderr('\n{}\n'.format(error))
+    line = data.split('\n')[error.lineno - 1]
+    error_line = [
+            '^' if error.colno - 1 == i else '-' for i, c in enumerate(line)]
+    stderr(line)
+    stderr(''.join(error_line))
+
+
+def main():
+    data = sys.stdin.read()
+    try:
+        parsed = loads(data)
+    except JSONDecodeError, e:
+        error_print(data, e)
+        sys.exit(71)
+
+    if '--keys-only' in sys.argv:
+        for k in parsed.keys():
+            print(k)
     else:
-        line = lines
-    error_marker = ''.join(['^' if i == e.colno else '-' for i, c in enumerate(line)])
-    print(line)
-    print(error_marker)
-    print(e, file=sys.stderr)
-    sys.exit(71)
+        print(dumps(parsed, sort_keys=True, indent=4, separators=(',', ': ')))
+        
 
-
+        
+if __name__ == '__main__':
+    main()
