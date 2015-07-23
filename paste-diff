@@ -1,0 +1,16 @@
+#!/usr/bin/env fish
+
+set file1 (mktemp /tmp/paste-diff-XXXXXXX)
+set file2 (mktemp /tmp/paste-diff-XXXXXXX)
+
+read -p 'echo Copy text for first file. Press enter when done.'
+pbpaste > $file1
+
+read -p 'echo Copy text for second file. Press enter when done.'
+pbpaste > $file2
+
+diff --side-by-side $file1 $file2
+
+rm $file1 $file2
+
+
