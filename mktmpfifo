@@ -1,0 +1,7 @@
+#!/usr/bin/env fish
+
+set file (mktemp /tmp/tmpfifo.XXXXXXX)
+echo "made tempprary file $file" > /dev/stderr
+
+
+
