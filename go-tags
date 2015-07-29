@@ -1,0 +1,2 @@
+#!/usr/bin/env fish
+ctags -R --languages=go
