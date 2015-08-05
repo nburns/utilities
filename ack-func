@@ -1,0 +1,2 @@
+#!/usr/bin/env 
+ack $argv[1] | grep func

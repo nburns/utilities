@@ -1,0 +1,48 @@
+#!/usr/bin/env python2
+import sys
+import inflection
+
+
+def main():
+
+    lines = [l for l in sys.stdin.read().split('\n')]
+
+    out = []
+
+    for line in lines:
+        if line:
+            out.append(' '.join(make_tags(line)))
+
+    print '\n'.join(out)
+
+def make_tags(line):
+    parts = line.split()
+    if len(parts) == 3:
+        name, type, tags = parts
+    if len(parts) == 2:
+        name, type = parts
+        tags = None
+    else:
+        return ''
+
+    if tags:
+        return name, type, tags
+    else:
+        return name_field(name), type, '`bson:"{}"json:"{}"`'.format(bson(name), json(name))
+
+def name_field(name):
+    return inflection.camelize(name, uppercase_first_letter=True)
+
+def bson(name):
+    return inflection.underscore(name) + omit_empty()
+
+def json(name):
+    return inflection.camelize(name, uppercase_first_letter=False) + omit_empty()
+
+def omit_empty():
+    return ',omitempty' if '-o' in sys.argv else ''
+
+if __name__ == '__main__':
+    main()
+
+
