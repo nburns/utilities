@@ -1,0 +1,23 @@
+#!/usr/bin/env python2
+import sys
+
+try:
+    from netifaces import interfaces, ifaddresses
+except ImportError:
+    print 'pip install netifaces'
+    sys.exit(1)
+
+def interesting(address):
+    return ':' not in address and address not in {'127.0.0.1', 'no addr'}
+
+
+for interface in interfaces():
+    for key, val in ifaddresses(interface).iteritems():
+        address = val[0].get('addr', 'no addr')
+        if interesting(address):
+            print interface, address
+
+
+
+        
+
