@@ -1,2 +1,32 @@
-#!/usr/bin/env fish
-pygmentize -g
+#!/usr/bin/env python2
+import sys
+import argparse
+
+try:
+    import termcolor
+except ImportError:
+    print 'pip install termcolor'
+    sys.exit(1)
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-f', '--forground', choices=termcolor.COLORS.keys())
+    parser.add_argument('-b', '--background', choices=termcolor.HIGHLIGHTS.keys())
+    parser.add_argument('-s', '--style', choices=termcolor.ATTRIBUTES.keys())
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+if __name__ == '__main__':
+    main()
+

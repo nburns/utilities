@@ -3,6 +3,7 @@ from __future__ import print_function
 import sys
 from simplejson import loads, dumps, JSONDecodeError
 from functools import partial
+import argparse
 
 stderr = partial(print, file=sys.stderr)
 
@@ -17,14 +18,23 @@ def error_print(data, error):
 
 
 def main():
-    data = sys.stdin.read()
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-k', '--keys-only', action='store_true', default=False)
+    parser.add_argument('-d', '--data', type=str, default=None)
+    args = parser.parse_args()
+
+    if args.data:
+        data = args.data
+    else:
+        data = sys.stdin.read()
+
     try:
         parsed = loads(data)
     except JSONDecodeError, e:
         error_print(data, e)
         sys.exit(71)
 
-    if '--keys-only' in sys.argv:
+    if args.keys_only:
         for k in parsed.keys():
             print(k)
     else:

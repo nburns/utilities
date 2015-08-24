@@ -1,2 +1,7 @@
 #!/usr/bin/env fish
-ctags -R --languages=go
+switch (hostname -s)
+    case bernoulli
+        gotags -R /Users/nick/outbound/outbound/src/outbound > /Users/nick/outbound/outbound/src/outbound/tags
+    case '*'
+        echo "configure a tags engine"
+end

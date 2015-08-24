@@ -1,0 +1,10 @@
+#!/usr/bin/env fish
+
+# -d look for calls that are preceeded by a dot
+
+if echo $argv | grep -- ' -d' >/dev/null
+    ack '\.'$argv[1]'\('
+else
+    ack $argv[1]'\(' | grep -v "func "
+end
+
