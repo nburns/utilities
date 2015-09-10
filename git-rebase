@@ -1,11 +1,11 @@
 #!/usr/bin/env fish
 if git diff --quiet
     set branch (git rev-parse --abbrev-ref HEAD)
-    git checkout stage
-    git fetch upstream
-    git rebase upstream/stage
+    git checkout master
+    git fetch origin
+    git rebase origin/master
     git checkout $branch
-    git rebase stage
+    git rebase master
 else
     echo commit your changes
 end
