@@ -1,2 +1,2 @@
-#!/usr/bin/env 
+#!/usr/bin/env fish
 git reset --soft HEAD~1
