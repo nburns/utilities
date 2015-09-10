@@ -1,5 +1,5 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 import sys
 
 stdin = ''.join([line for line in sys.stdin])
-print stdin.decode('string_escape')
+print(stdin.decode('string_escape'))

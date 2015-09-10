@@ -1,10 +1,12 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 import sys
-import inflection
+try:
+    import inflection
+except ImportError:
+    sys.exit('pip install inflection')
 
 
 def main():
-
     lines = [l for l in sys.stdin.read().split('\n')]
 
     out = []
@@ -13,7 +15,7 @@ def main():
         if line:
             out.append(' '.join(make_tags(line)))
 
-    print '\n'.join(out)
+    print('\n'.join(out))
 
 def make_tags(line):
     parts = line.split()

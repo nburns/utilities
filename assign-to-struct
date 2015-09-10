@@ -1,7 +1,11 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 import sys
-import inflection
 import argparse
+
+try:
+    import inflection
+except ImportError:
+    sys.exit('pip install inflection')
 
 
 

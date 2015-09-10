@@ -1,32 +1,22 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 import sys
 import argparse
 
 try:
     import termcolor
 except ImportError:
-    print 'pip install termcolor'
-    sys.exit(1)
+    sys.exit('pip install termcolor')
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('-f', '--forground', choices=termcolor.COLORS.keys())
-    parser.add_argument('-b', '--background', choices=termcolor.HIGHLIGHTS.keys())
+    parser.add_argument('text', nargs='?', default=None)
+    parser.add_argument('-f', '--fore', choices=termcolor.COLORS.keys())
+    parser.add_argument('-b', '--back', choices=termcolor.HIGHLIGHTS.keys())
     parser.add_argument('-s', '--style', choices=termcolor.ATTRIBUTES.keys())
+    args = parser.parse_args()
 
-
-
-
-
-
-
-
-
-
-
-
-
+    text = getattr(args, 'text') or sys.stdin.read()
+    termcolor.cprint(text, args.fore, args.back, args.style)
 
 if __name__ == '__main__':
     main()
-

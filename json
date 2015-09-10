@@ -1,11 +1,15 @@
-#!/usr/bin/env python2
-from __future__ import print_function
+#!/usr/bin/env python3
 import sys
-from simplejson import loads, dumps, JSONDecodeError
-from functools import partial
+import functools
 import argparse
 
-stderr = partial(print, file=sys.stderr)
+try:
+    import simplejson
+except ImportError:
+    sys.exit('pip install simplejson')
+
+
+stderr = functools.partial(print, file=sys.stderr)
 
 
 def error_print(data, error):
@@ -29,8 +33,8 @@ def main():
         data = sys.stdin.read()
 
     try:
-        parsed = loads(data)
-    except JSONDecodeError, e:
+        parsed = simplejson.loads(data)
+    except simplejson.JSONDecodeError as e:
         error_print(data, e)
         sys.exit(71)
 
@@ -38,7 +42,8 @@ def main():
         for k in parsed.keys():
             print(k)
     else:
-        print(dumps(parsed, sort_keys=True, indent=4, separators=(',', ': ')))
+        print(simplejson.dumps(
+            parsed, sort_keys=True, indent=4, separators=(',', ': ')))
         
 
         
