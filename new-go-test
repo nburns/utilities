@@ -1,5 +1,0 @@
-#!/usr/bin/env python2
-print '''func Test(t * testing.T) {
-    assert := assert.New(t)
-\t
-}'''

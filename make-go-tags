@@ -1,7 +1,10 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 import sys
-import inflection
 import argparse
+try:
+    import inflection
+except ImportError:
+    sys.exit('pip install inflection')
 
 def get_args():
     a = argparse.ArgumentParser()
@@ -28,7 +31,7 @@ def main():
                 tags = make_tags(name, args)
                 out.append('{} {} {}'.format(name, kind, tags))
 
-    print '\n'.join(out)
+    print('\n'.join(out))
 
 
 def get_parts_of_line(line):

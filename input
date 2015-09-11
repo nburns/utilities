@@ -1,7 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
+import sys
 
-from sys import argv as argv
-
-argv.pop(0)
-
-print raw_input(' '.join(argv) + '\n')
+print(input(' '.join(sys.argv[1:])))
