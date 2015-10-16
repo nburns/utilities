@@ -1,0 +1,3 @@
+#!/usr/bin/env fish
+git diff --name-only --diff-filter=U --relative | tr '\n' '\t'
+echo
