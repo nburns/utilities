@@ -1,0 +1,37 @@
+#!/usr/bin/env python3
+import json
+import sys
+import pprint
+
+def headers(entry):
+    return ' '.join(["-H '{}: {}'".format(d['name'], d['value']) for d in entry['request']['headers']])
+
+
+def method(entry):
+    return '-X {}'.format(entry['request']['method'])
+
+
+def cookies(entry):
+    cookies = merge_dicts(entry['request']['cookies'])
+        
+    return '--cookie "' + '; '.join(['{}:{}'.format(k, v) for k, v in cookies.items()]) + '"'
+
+
+def merge_dicts(dicts):
+    d = {}
+    [d.update(other) for other in dicts]
+    return d
+
+
+def main():
+    har_text = sys.stdin.read()
+    har = json.loads(har_text)
+
+    for entry in har['log']['entries']:
+        command = ['curl', '-v', entry['request']['url'], method(entry), headers(entry), cookies(entry)]
+        print(' '.join(command))
+        print()
+
+
+if __name__ == "__main__":
+    main()

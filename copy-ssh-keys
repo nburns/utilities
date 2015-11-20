@@ -1,0 +1,16 @@
+#!/usr/bin/env fish
+if [ ! -d ~/.ssh ]
+    mkdir ~/.ssh
+end
+
+if [ -e ~/Dropbox ]
+    for key in (find ~/Dropbox/Documents/ssh-keys)
+        if [ ! -d "$key" ]
+            echo (basename "$key")
+            cp $key ~/.ssh/(basename "$key")
+            chmod 600 ~/.ssh/(basename "$key")
+        end
+    end
+else
+    echo '~/Dropbox does not exist'
+end

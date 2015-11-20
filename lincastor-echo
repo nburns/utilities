@@ -1,0 +1,10 @@
+#!/usr/bin/env fish
+echo 'URL         ' $URL          
+echo 'URL_SCHEME  ' $URL_SCHEME   
+echo 'URL_HOST    ' $URL_HOST     
+echo 'URL_PORT    ' $URL_PORT     
+echo 'URL_QUERY   ' $URL_QUERY    
+echo 'URL_PATH    ' $URL_PATH     
+echo 'URL_FRAGMENT' $URL_FRAGMENT 
+echo 'URL_VALUE   ' $URL_VALUE    
+echo 'URL_B64VALUE' $URL_B64VALUE 
