@@ -1,0 +1,4 @@
+#!/usr/bin/env fish
+set search_string (echo $argv[1] | sed s/test_//g | tr '_' ' ')
+echo '"'$search_string'"'
+eval "ack \"$search_string\""
