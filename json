@@ -42,10 +42,15 @@ def main():
         for k in parsed.keys():
             print(k)
     else:
-        print(simplejson.dumps(
-            parsed, sort_keys=True, indent=4, separators=(',', ': ')))
-        
-
+        print(
+            simplejson.dumps(
+                parsed,
+                ensure_ascii=False,
+                sort_keys=True,
+                indent=4,
+                separators=(',', ': ')
+            )
+        )
         
 if __name__ == '__main__':
     main()
