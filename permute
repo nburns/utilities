@@ -6,6 +6,7 @@ import argparse
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('-w', '--wordsonly', action='store_true', default=False)
+    parser.add_argument('-l', '--length', action='store', default=None, type=int)
     parser.add_argument('string_to_permute', nargs='?', default=None)
     args = parser.parse_args()
     
@@ -17,12 +18,21 @@ def main():
     else:
         filter_set = None
 
-    for perm in permutations(string_to_permute):
-        word = ''.join(perm)
-        if not filter_set:
-            print(word)
-        elif word in filter_set:
-            print(word)
+    if  args.length is not None and len(string_to_permute) < args.length:
+        sys.exit('--length ({}) must be ≤ number of chars in input {}'.format(
+            args.length,
+            len(string_to_permute)
+        ))
+
+    min_length = len(string_to_permute) if args.length is None else args.length
+
+    for length in range(min_length, len(string_to_permute) + 1):
+        for perm in permutations(string_to_permute, length):
+            word = ''.join(perm)
+            if not filter_set:
+                print(word)
+            elif word in filter_set:
+                print(word)
 
 if __name__ == '__main__':
     main()
