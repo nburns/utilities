@@ -1,0 +1,50 @@
+#!/usr/bin/env python3
+import sys
+from copy import copy
+
+
+def parse_flags():
+    global_flag = '-g'
+    export_flag = '-x'
+    empty_flag = '-e'
+
+    if empty_flag in sys.argv:
+        return empty_flag + ' ', False # values cannot be specified with erase
+
+    flags = {global_flag, export_flag}
+
+    for flag in copy(flags): # flags specified suppress themselves in output
+        if flag in sys.argv:
+            flags.remove(flag)
+
+    flag_string = (' '.join(flags) + ' ') if flags else ''
+    return flag_string, True # values are required for setting
+    
+
+def main():
+    flags, value_allowed = parse_flags()
+
+    for line in sys.stdin.readlines():
+
+        parts = line.strip().split(' ')
+
+        if len(parts) == 3:
+            
+            name, _, value = parts
+
+            if value_allowed:
+                command = 'set {}{} "{}";\n'.format(flags, name, value)
+            else:
+                command = 'set {}{};\n'.format(flags, name)
+
+            tee(command)
+
+def tee(obj):
+    print(obj)
+    
+    if not sys.stdout.isatty():
+        print(obj, file=sys.stderr)
+
+
+if __name__ == "__main__":
+    main()
