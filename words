@@ -1,0 +1,22 @@
+#!/usr/bin/env python3
+import sys
+import argparse
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('word_part', nargs='?', default=None)
+    args = parser.parse_args()
+
+    word_part = args.word_part
+
+    if word_part:
+        with open('/usr/share/dict/words') as wordlist:
+            filter_set = {line.strip().lower() for line in wordlist}
+            filter_set = {w for w in filter_set if w.startswith(word_part)}
+
+        for word in filter_set:
+            print(word)
+
+if __name__ == "__main__":
+    main()
+        
