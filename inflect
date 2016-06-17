@@ -1,0 +1,40 @@
+#!/usr/bin/env python3
+import sys
+import argparse
+
+try:
+    import inflection
+except ImportError:
+    sys.exit('pip install inflection')
+
+def get_formatting_scheme():
+    schemes = {
+        '-c': inflection.camelize,
+        '--camel': inflection.camelize,
+
+        '-s': inflection.underscore,
+        '--snake': inflection.underscore,
+    }
+
+    for scheme in schemes.keys():
+        if scheme in sys.argv:
+            sys.argv.pop(sys.argv.index(scheme))
+            return schemes[scheme]
+
+    sys.exit(
+        'unknown formatting scheme, choose from ' + ', '.join(sorted(schemes.keys()))
+    )
+
+def get_string():
+    if len(sys.argv) > 1:
+        return ' '.join(sys.argv[1:])
+    else:
+        return sys.stdin.read()
+
+def main():
+    scheme = get_formatting_scheme()
+
+    print(scheme(get_string()))
+
+if __name__ == "__main__":
+    main()
