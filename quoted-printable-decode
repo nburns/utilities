@@ -1,0 +1,8 @@
+#!/usr/bin/env python3
+import sys
+from quopri import decode, decodestring
+
+if len(sys.argv) > 1:
+    print(decodestring(' '.join(sys.argv[1:])).decode())
+else:
+    decode(sys.stdin, sys.stdout.buffer)
