@@ -1,2 +1,3 @@
 #!/usr/bin/env sh
+# default format is +"%a %b %d %H:%M:%S %Z %Y"
 date -u +"%Y-%m-%dT%H:%M:%SZ"

@@ -1,0 +1,15 @@
+#!/usr/bin/env ruby
+begin
+  require 'sonos'
+rescue LoadError
+  abort 'gem install sonos'
+end
+
+system = Sonos::System.new
+
+volumes = system.speakers.map do |speaker|
+  speaker.volume -= 1
+  speaker.volume
+end
+
+puts volumes.join(', ')
