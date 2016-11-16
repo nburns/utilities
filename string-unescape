@@ -2,4 +2,6 @@
 import sys
 
 stdin = ''.join([line for line in sys.stdin])
-print(stdin.decode('string_escape'))
+unescaped = stdin.encode('utf8').decode('unicode-escape')
+unescaped = unescaped[1:-1] if unescaped.startswith('"') and unescaped.endswith('"') else unescaped
+print(unescaped)

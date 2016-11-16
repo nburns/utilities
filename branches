@@ -1,4 +1,5 @@
 #!/usr/bin/env fish
 git for-each-ref \
     --sort=committerdate refs/heads/ \
-    --format='%(HEAD) %(color:green)%(refname:short)%(color:reset), %(color:magenta)%(objectname:short)%(color:reset), %(contents:subject)' | tac
+    --format='%(HEAD) %(color:green)%(refname:short)%(color:reset), %(color:magenta)%(objectname:short)%(color:reset), %(contents:subject)'
+

@@ -1,0 +1,2 @@
+#!/usr/bin/env ruby
+puts $stdin.read.strip.split('').group_by(&:itself).keys.count

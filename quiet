@@ -5,11 +5,69 @@ rescue LoadError
   abort 'gem install sonos'
 end
 
-system = Sonos::System.new
+require 'optparse'
 
-volumes = system.speakers.map do |speaker|
-  speaker.volume -= 1
-  speaker.volume
+def get_options
+  options = {
+    readonly: false,
+    action: :quiet,
+  }
+
+  OptionParser.new do |opts|
+    opts.banner = 'Usage'
+
+    opts.on('-l', '--list', 'Print information about avalible speakers') do |v|
+      options[:action] = :list
+    end
+
+    opts.on('-s SPEAKERS', '--speaker-names SPEAKERS', 'Only interact with speaker name') do |names|
+      options[:speakers] = Set.new(names.split(',').map(&:strip))
+    end
+
+    opts.on('-p', '--pause', 'Pause what is currently playing') do |pause|
+      options[:action] = :pause
+    end
+
+
+  end.parse!
+  options
 end
 
-puts volumes.join(', ')
+def speaker_info(speaker)
+  "Speaker '#{speaker.name}' 🔊 #{speaker.volume} 🎵 #{speaker.now_playing[:title]}"
+end
+
+def quiet_speaker(speaker)
+  begin
+    speaker.volume -= 1
+  rescue StandardError => e
+    puts e
+  end
+end
+
+def main
+  options = get_options
+
+  system = Sonos::System.new
+
+  speakers = system.speakers
+    .select { |s| options[:speakers].nil? || options[:speakers].include?(s.name)}
+    .sort_by(&:name)
+
+  speakers.each do |speaker|
+    case options[:action]
+    when :pause
+      speaker.pause
+    when :quiet
+      quiet_speaker(speaker)
+    when :list
+      # no op
+    else
+      raise "Unknonw action #{options[:action]}"
+    end
+
+    puts speaker_info(speaker)
+  end
+end
+
+main
