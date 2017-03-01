@@ -1,0 +1,51 @@
+#!/usr/bin/env python3
+
+import logging
+import signal
+import sys
+import http.server
+from IPython import embed
+import argparse
+
+class Handler(http.server.BaseHTTPRequestHandler):
+
+    def respond(self):
+        self.print_info()
+
+        self.send_response(204)
+        self.end_headers()
+        self.wfile.write(''.encode('utf-8'))
+
+    do_HEAD = do_PUT = do_POST = do_PATCH = do_DELETE = do_OPTIONS = do_GET = respond
+
+    def print_info(self):
+        print('__________________')
+        print(self.requestline)
+        print(self.headers)
+        print('CLIENT ADDRESS:', self.client_address)
+
+    def log_message(self, fmt, *args):
+        return
+
+
+def get_args():
+    parser = argparse.ArgumentParser(description='Logs HTTP requests')
+    parser.add_argument('-p', '--port', type=int, default=8001)
+    parser.add_argument('-i', '--ip', type=str, default='0.0.0.0')
+    return parser.parse_args()
+
+def main():
+    args = get_args()
+    server = http.server.HTTPServer((args.ip, args.port), Handler)
+
+    def close(*_):
+        server.server_close()
+        sys.exit(0)
+
+    signal.signal(signal.SIGINT, close)
+
+    server.serve_forever()
+
+
+if __name__ == '__main__':
+    main()
