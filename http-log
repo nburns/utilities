@@ -1,48 +1,68 @@
 #!/usr/bin/env python3
 
-import logging
-import signal
-import sys
-import http.server
 from IPython import embed
 import argparse
+import http.server
+import logging
+import os
+import signal
+import ssl
+import sys
 
-class Handler(http.server.BaseHTTPRequestHandler):
+def get_handler(debug=False):
 
-    def respond(self):
-        self.print_info()
+    class Handler(http.server.BaseHTTPRequestHandler):
 
-        self.send_response(204)
-        self.end_headers()
-        self.wfile.write(''.encode('utf-8'))
+        def respond(self):
+            self.print_info()
 
-    do_HEAD = do_PUT = do_POST = do_PATCH = do_DELETE = do_OPTIONS = do_GET = respond
+            if debug:
+                embed(display_banner=False, confirm_exit=False)
 
-    def print_info(self):
-        print('__________________')
-        print(self.requestline)
-        print(self.headers)
-        print('CLIENT ADDRESS:', self.client_address)
+            self.send_response(204)
+            self.end_headers()
+            self.wfile.write(''.encode('utf-8'))
 
-    def log_message(self, fmt, *args):
-        return
+        do_HEAD = do_PUT = do_POST = do_PATCH = do_DELETE = do_OPTIONS = do_GET = respond
+
+        def print_info(self):
+            print('__________________')
+            print(self.requestline)
+            print(self.headers)
+            print('CLIENT ADDRESS:', self.client_address)
+
+    return Handler
+
+def register_signal(action):
+    def do_action(*_):
+        action()
+        sys.exit(0)
+
+    signal.signal(signal.SIGINT, do_action)
 
 
 def get_args():
     parser = argparse.ArgumentParser(description='Logs HTTP requests')
     parser.add_argument('-p', '--port', type=int, default=8001)
     parser.add_argument('-i', '--ip', type=str, default='0.0.0.0')
+    parser.add_argument('-s', '--https', default=False, action='store_true')
+    parser.add_argument('-d', '--debug', default=False, action='store_true')
+
+    # openssl req -new -x509 -keyout server.pem -out server.pem -days 365 -nodes
+    default_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'server.pem')
+    parser.add_argument('-c', '--cert', type=str, default=default_path)
+
     return parser.parse_args()
 
 def main():
     args = get_args()
-    server = http.server.HTTPServer((args.ip, args.port), Handler)
 
-    def close(*_):
-        server.server_close()
-        sys.exit(0)
+    server = http.server.HTTPServer((args.ip, args.port), get_handler(debug=args.debug))
 
-    signal.signal(signal.SIGINT, close)
+    if args.https:
+        server.socket = ssl.wrap_socket(server.socket, certfile=args.cert, server_side=True)
+
+    register_signal(server.server_close)
 
     server.serve_forever()
 
