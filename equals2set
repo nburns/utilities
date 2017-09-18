@@ -19,7 +19,7 @@ def parse_flags():
 
     flag_string = (' '.join(flags) + ' ') if flags else ''
     return flag_string, True # values are required for setting
-    
+
 
 def main():
     flags, value_allowed = parse_flags()
@@ -29,19 +29,21 @@ def main():
         parts = line.strip().split(' ')
 
         if len(parts) == 3:
-            
+
             name, _, value = parts
 
             if value_allowed:
-                command = 'set {}{} "{}";\n'.format(flags, name, value)
+                command = 'set {}{} "{}";'.format(flags, name, value)
             else:
-                command = 'set {}{};\n'.format(flags, name)
+                command = 'set {}{};'.format(flags, name)
 
             tee(command)
 
+    print('')
+
 def tee(obj):
     print(obj)
-    
+
     if not sys.stdout.isatty():
         print(obj, file=sys.stderr)
 
