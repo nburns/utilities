@@ -1,0 +1,6 @@
+#!/usr/bin/env python3
+import fileinput
+import subprocess
+
+for line in fileinput.input():
+

@@ -1,0 +1,26 @@
+#!/usr/bin/env python3
+import sys
+import datetime
+import socket
+from time import sleep
+
+def wait_for_dns(message_fn, host):
+    def able_to_resolve(host):
+        try:
+            socket.gethostbyname(host)
+            return True
+        except socket.gaierror:
+            return False
+
+    start = datetime.datetime.now()
+    checks = 1
+    while not able_to_resolve(host):
+        checks += 1
+        message_fn('Unable to resolve %s. Sleeping for 10 seconds.' % host)
+        sleep(10)
+
+    if checks > 1:
+        message_fn('Waited %s for DNS to resolve. (%s checks)' % ((datetime.datetime.now() - start), checks))
+
+if __name__ == '__main__':
+    wait_for_dns(print, sys.argv[1])
