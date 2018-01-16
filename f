@@ -1,5 +1,5 @@
 #!/usr/bin/env fish
-if set -q argv
+if [ -n "$argv" ]
     set file (fzf -i -q $argv)
 else
     set file (fzf -i)
