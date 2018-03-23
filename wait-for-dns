@@ -5,6 +5,7 @@ import socket
 from time import sleep
 
 def wait_for_dns(message_fn, host):
+    sleep_time = 2
     def able_to_resolve(host):
         try:
             socket.gethostbyname(host)
@@ -16,8 +17,8 @@ def wait_for_dns(message_fn, host):
     checks = 1
     while not able_to_resolve(host):
         checks += 1
-        message_fn('Unable to resolve %s. Sleeping for 10 seconds.' % host)
-        sleep(10)
+        message_fn('Unable to resolve %s. Sleeping for %s seconds.' % (host, sleep_time))
+        sleep(sleep_time)
 
     if checks > 1:
         message_fn('Waited %s for DNS to resolve. (%s checks)' % ((datetime.datetime.now() - start), checks))
