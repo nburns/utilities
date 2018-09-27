@@ -23,4 +23,8 @@ def wait_for_dns(message_fn, host):
         message_fn('Waited %s for DNS to resolve. (%s checks)' % ((datetime.datetime.now() - start), checks))
 
 if __name__ == '__main__':
-    wait_for_dns(print, sys.argv[1])
+    try:
+        wait_for_dns(print, sys.argv[1])
+    except KeyboardInterrupt as e:
+        print('exiting.')
+        sys.exit(0)

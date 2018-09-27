@@ -1,0 +1,7 @@
+#!/usr/bin/env fish
+# uses html-xml-utils
+if [ (count $argv) -gt 1 ]
+    hxnormalize -l 240 -x $argv[1] 2>/dev/null | hxselect -s '\n' -c "$argv[2]"
+else
+    hxnormalize -l 240 | hxselect -s '\n' -c "$argv[1]"
+end
