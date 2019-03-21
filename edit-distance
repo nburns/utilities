@@ -1,0 +1,15 @@
+#!/usr/bin/env ruby
+
+begin
+  require 'levenshtein'
+rescue LoadError
+  abort 'gem install levenshtein-ffi; gem install levenshtein'
+end
+
+
+max_length = ARGV.map(&:length).max
+
+base = ARGV.shift
+ARGV.each do |arg|
+  puts [base.ljust(max_length), arg.ljust(max_length), Levenshtein.distance(base, arg)].join("\t")
+end
