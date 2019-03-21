@@ -1,9 +1,0 @@
-#!/usr/bin/env fish
-
-set p $argv[1]
-
-if [ -d $p ]
-	set -g -x PATH $PATH $p
-else
-	echo "Could not add \"$p\" to path"
-end
