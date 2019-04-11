@@ -1,0 +1,9 @@
+#!/usr/bin/env fish
+if defaults read com.apple.universalaccess stereoAsMono | grep 1 > /dev/null
+    defaults write com.apple.universalaccess stereoAsMono 0
+    echo 'stereo output'
+else
+    defaults write com.apple.universalaccess stereoAsMono 1
+    echo 'mono output'
+end
+
