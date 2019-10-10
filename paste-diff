@@ -1,17 +1,25 @@
 #!/usr/bin/env fish
+set filter $argv[1] # filter text through optional utility before diffing
 
 set file1 (mktemp /tmp/paste-diff-XXXXXXX)
 set file2 (mktemp /tmp/paste-diff-XXXXXXX)
 
 read -p 'echo Copy text for first file. Press enter when done.'
-pbpaste > $file1
+if [ -z $filter ]
+    pbpaste > $file1
+else
+    pbpaste | eval "$filter" > $file1
+end
 
 read -p 'echo Copy text for second file. Press enter when done.'
-pbpaste > $file2
+
+if [ -z $filter ]
+    pbpaste > $file2
+else
+    pbpaste | eval "$filter" > $file2
+end
 
 diff --side-by-side --width (tput cols) $file1 $file2
 #vimdiff $file1 $file2
 
 rm $file1 $file2
-
-

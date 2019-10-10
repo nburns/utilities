@@ -1,0 +1,7 @@
+#!/usr/bin/env fish
+set FIND $argv[1]
+set REPLACE $argv[2]
+
+echo "FIND $FIND, REPLACE $REPLACE"
+
+ag -w "$FIND" | cut -d : -f 1 | sort -u | xargs perl -p -i -e "s/$FIND/$REPLACE/g"

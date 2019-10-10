@@ -1,0 +1,6 @@
+#!/usr/local/bin/fish
+
+while true
+    notify remember blink
+    sleep (math '20 * 60')
+end

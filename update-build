@@ -1,0 +1,202 @@
+#!/usr/bin/env python3
+from IPython import embed
+from urllib.parse import quote
+import argparse
+import os
+import subprocess
+import sys
+import requests
+import re
+
+
+def error(msg):
+    print(msg, file=sys.stderr)
+    sys.exit(1)
+
+
+try:
+    TC_USER = os.environ['TC_USER']
+    TC_PASS = os.environ['TC_PASS']
+except KeyError:
+    error('set TC_USER and TC_PASS to your team city username and password')
+
+TC_URL = os.environ.get('TC_URL', 'https://ci.jamasoftware.net/app/rest')
+RETRY_TIMEOUT = 60
+
+# https://confluence.jetbrains.com/display/TCD18/REST+API#RESTAPI-RESTAuthentication
+team_city = requests.Session()
+team_city.auth = (TC_USER, TC_PASS)
+team_city.headers = {'Accept': 'application/json'}
+
+
+try:
+    GH_USER = os.environ['GH_USER']
+    GH_TOKEN = os.environ['GH_TOKEN']
+except KeyError:
+    error('set GH_USER and GH_TOKEN to your github username and token')
+
+GH_URL = "https://api.github.com"
+
+github = requests.Session()
+github.auth = (GH_USER, GH_TOKEN)
+github.headers = {
+    'Accept': 'application/vnd.github.shadow-cat-preview+json',
+    'User-Agent': GH_USER
+}
+
+
+def pull_requests():
+    r = github.get(GH_URL + '/repos/JamaSoftware/jama-frontend/pulls',
+                   params={'state': 'open', 'sort': 'created'})
+
+    if r.ok:
+        return r.json()
+
+    print(r.text, file=sys.stderr)
+    r.raise_for_status()
+
+
+def pull_request_id(branch_name):
+    parts = re.split(' |-', branch_name)
+
+    def has_all_parts(name):
+        for part in parts:
+            print(part, 'in', name, part in name)
+            if part not in name:
+                return False
+        return True
+
+    for p in pull_requests():
+        if has_all_parts(p['title']):
+            return p['number']
+
+    raise RuntimeError(
+        f'Unable to find pull request containing: {", ".join(parts)}')
+
+
+def build_params(locators):
+    '''
+    >>> build_params({'foo': '1', 'bar': ' '})
+    'foo:1,bar:%20'
+    '''
+    # https://confluence.jetbrains.com/display/TCD18/REST+API#RESTAPI-Locator
+    return ','.join(f'{quote(k)}:{quote(v)}' for k, v in locators.items())
+
+
+def get(route, count=10, **locators):
+    params = {
+        'locator': build_params(locators),
+        'count': count,
+    }
+
+    r = team_city.get(TC_URL + route, params=params)
+
+    if r.ok:
+        return r.json()
+
+    print(r.text, file=sys.stderr)
+    r.raise_for_status()
+
+
+def builds(branch):
+    return get('/builds',
+               buildType='FrontEnd_JamaFrontendNext',
+               branch=branch)['build']
+
+
+def current_branch():
+    return (subprocess
+            .check_output(['git', 'symbolic-ref', 'HEAD'])
+            .decode('utf-8')
+            .lstrip('refs/heads/')
+            .strip())
+
+
+def has_changes():
+    return bool(subprocess
+                .check_output(['git', 'status', '--porcelain'])
+                .decode('utf-8')
+                .strip())
+
+
+def write_build(number):
+    with open('frontend.properties', 'w') as f:
+        f.truncate()
+        f.write(f'frontend.version={number}.0.0\n')
+
+
+def checkout(branch_name):
+    try:
+        subprocess.check_call(
+            ['git', 'checkout', '-b', branch_name])
+    except subprocess.CalledProcessError:
+        subprocess.check_call(
+            ['git', 'checkout', branch_name])
+
+
+def commit(msg):
+    subprocess.check_call(['git', 'commit', '-am', msg])
+
+
+def push():
+    subprocess.check_call(['git', 'push'])
+
+
+def fetch():
+    subprocess.check_call(['git', 'fetch'])
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description='creates or updates a branch with the current build number')
+
+    parser.add_argument(
+        '--backend',
+        help='Path to the contour backend repo',
+        default="../connect")
+
+    parser.add_argument(
+        '--list-builds',
+        help='Output build information',
+        default=False,
+        action='store_true')
+
+    args = parser.parse_args()
+
+    frontend_branch_name = 'pull/' + pull_request_id(current_branch())
+
+    branch_builds = sorted(builds(current_branch()), key=lambda b: b['number'])
+
+    if args.list_builds:
+        print(branch_builds)
+        return
+
+    return
+
+    if not branch_builds:
+        error(f'Unable find any builds for {frontend_branch_name}')
+
+    build = branch_builds[-1]
+    build_number = build['number']
+
+    os.chdir(args.backend)
+
+    if has_changes():
+        error('Changes detected, commit before running this')
+
+    fetch()
+    checkout('develop')
+
+    checkout(frontend_branch_name)  # use the same name for the backend
+
+    write_build(build_number)
+
+    if has_changes():
+        commit(f'Set FE version to {build_number}')
+        push()
+    else:
+        error('Already at latest build')
+
+
+if __name__ == '__main__':
+    main()

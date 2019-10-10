@@ -1,0 +1,32 @@
+#!/usr/bin/env python3
+import os
+
+try:
+    from flask import Flask, request, jsonify
+except ImportError:
+    print('pip install flask')
+
+os.environ['FLASK_ENV'] = os.environ.get('FLASK_ENV', 'development')
+app = Flask(__name__)
+
+
+@app.route("/headers")
+def headers():
+    return jsonify(dict(request.headers))
+
+
+@app.route("/echo")
+def echo():
+    def all_values(k):
+        values = request.args.getlist(k)
+        return values[0] if len(values) == 1 else values
+
+    return jsonify({k: all_values(k) for k in request.values.keys()})
+
+
+def main():
+    app.run(debug=True)
+
+
+if __name__ == '__main__':
+    main()

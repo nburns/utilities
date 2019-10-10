@@ -1,0 +1,12 @@
+#!/usr/bin/env fish
+set FILE_NAME $argv[1]
+set LINE_NUM $argv[2]
+set BEFORE $argv[3]
+set AFTER $argv[4]
+set PWD $argv[5]
+
+if echo "$FILE_NAME" | egrep '\.java$'
+    idea "$FILE_NAME:$LINE_NUM"
+else
+    open $FILE_NAME
+end
