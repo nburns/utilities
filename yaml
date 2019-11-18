@@ -12,6 +12,7 @@ except ImportError:
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('-j', '--to-json', action='store_true', default=False)
+    parser.add_argument('file_path', nargs="?", default=None)
     args = parser.parse_args()
 
     if args.to_json:
@@ -27,8 +28,13 @@ def main():
             return yaml.dump(data,
                              default_flow_style=False)
 
+    if args.file_path:
+        data_file = open(args.file_path, 'r')
+    else:
+        data_file = sys.stdin
+
     try:
-        loaded = yaml.safe_load(sys.stdin.read())
+        loaded = yaml.safe_load(data_file.read())
         print(dump(loaded))
     except yaml.parser.ParserError as e:
         print(e, file=sys.stderr)
