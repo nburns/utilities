@@ -6,22 +6,32 @@ try:
 except ImportError:
     print('pip install flask')
 
+from werkzeug.routing import Rule
+
 os.environ['FLASK_ENV'] = os.environ.get('FLASK_ENV', 'development')
+
 app = Flask(__name__)
+app.url_map.add(Rule('/echo', endpoint='echo'))
+app.url_map.add(Rule('/headers', endpoint='headers'))
 
 
-@app.route("/headers")
+@app.endpoint("headers")
 def headers():
     return jsonify(dict(request.headers))
 
 
-@app.route("/echo")
+@app.endpoint("echo")
 def echo():
     def all_values(k):
         values = request.args.getlist(k)
         return values[0] if len(values) == 1 else values
 
-    return jsonify({k: all_values(k) for k in request.values.keys()})
+    if request.args.get('body'):
+        body = request.args.get('body')
+    else:
+        body = jsonify({k: all_values(k) for k in request.values.keys()})
+
+    return (body, request.args.get('error') or 200)
 
 
 def main():
