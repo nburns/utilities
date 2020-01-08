@@ -1,0 +1,40 @@
+#!/usr/bin/env fish
+set conf (mktemp -d "/tmp/proxy-"(uuid)".conf")
+
+echo $conf
+
+set ifs "$IFS"
+set IFS ''
+
+set $conf_contents (echo -e "daemon off;
+error_log /dev/stdout;
+events {
+    worker_connections 1024;
+}
+http {
+    access_log /dev/stdout;
+
+    server {
+        listen 80;
+        location / {
+            proxy_set_header Host \$host;
+            proxy_pass http://127.0.0.1:3000;
+        }
+    }
+    server {
+        listen 443 ssl;
+
+        ssl_certificate cert.pem;
+        ssl_certificate_key key.pem;
+        location / {
+            proxy_set_header Host \$host;
+            proxy_pass http://127.0.0.1:3000;
+        }
+    }
+}")
+set IFS "$ifs"
+
+echo "$conf_contents" > $conf
+
+
+nginx -c "$conf"
