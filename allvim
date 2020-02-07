@@ -1,0 +1,2 @@
+#!/usr/bin/env fish
+duti -s (osascript -e "id of app \"Macvim\"") public.plain-text all
