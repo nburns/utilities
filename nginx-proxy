@@ -1,16 +1,24 @@
 #!/usr/bin/env fish
-set conf (mktemp -d "/tmp/proxy-"(uuid)".conf")
+if [ -e ./cert.pem ]; and [ -e ./key.pem ]
+else
+    echo "Generate a key and cert with:"
+    echo "openssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem -days 365 -nodes"
+    echo "and add the cert to keychain before proxying"
+    exit 1
+end
 
-echo $conf
+set conf_file (mktemp "/tmp/proxy-"(uuid)".conf")
 
-set ifs "$IFS"
 set IFS ''
+echo "daemon off;
+master_process off;
 
-set $conf_contents (echo -e "daemon off;
 error_log /dev/stdout;
+
 events {
     worker_connections 1024;
 }
+
 http {
     access_log /dev/stdout;
 
@@ -23,18 +31,15 @@ http {
     }
     server {
         listen 443 ssl;
-
-        ssl_certificate cert.pem;
-        ssl_certificate_key key.pem;
+        ssl_certificate "(pwd)"/cert.pem;
+        ssl_certificate_key "(pwd)"/key.pem;
         location / {
             proxy_set_header Host \$host;
             proxy_pass http://127.0.0.1:3000;
         }
     }
-}")
-set IFS "$ifs"
+}" > "$conf_file"
 
-echo "$conf_contents" > $conf
+nginx -c "$conf_file"
 
-
-nginx -c "$conf"
+rm "$conf_file"
