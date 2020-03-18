@@ -1,6 +1,6 @@
 #!/usr/bin/env fish
 set file (mktemp /tmp/vipe-XXXXX)
 cp /dev/stdin $file
-vim $file </dev/tty >/dev/tty
+eval "$EDITOR $file </dev/tty >/dev/tty"
 cat $file
 rm $file
