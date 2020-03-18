@@ -1,0 +1,12 @@
+#!/usr/bin/env fish
+
+if cat /etc/pam.d/sudo | grep tid
+    echo "already in file?"
+else
+    echo "updating file"
+    sudo sed -i'' -e '1 a\
+    auth       sufficient     pam_tid.so\
+    ' /etc/pam.d/sudo
+end
+cat /etc/pam.d/sudo
+
