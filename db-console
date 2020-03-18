@@ -1,0 +1,85 @@
+#!/usr/bin/env python3
+from IPython import embed
+from dataclasses import dataclass
+from urllib.parse import urlparse
+
+import argparse
+import os
+import re
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        'url', default=None, help="A database connection url")
+
+    args = parser.parse_args()
+
+    url = urlparse(args.url)
+    netloc = parse_netloc(url.netloc)
+
+    connection = Connection(
+        host=url.hostname,
+        port=url.port,
+        database=url.path.lstrip('/'),
+        engine=url.scheme,
+        user=netloc.user,
+        password=netloc.password,
+        url=url,
+    )
+
+    connection.connect()
+
+
+@dataclass
+class Connection:
+    user: str = None
+    host: str = None
+    port: int = None
+    password: str = None
+    database: str = None
+    engine: str = None
+    url: str = None
+
+    def connect(self):
+        types = {
+            'mysql': mysql,
+            'postgres': postgres,
+        }
+
+        os.execvp(self.engine, types[self.engine](self))
+
+
+def parse_netloc(netloc_str):
+    @dataclass
+    class Netloc:
+        user: str = None
+        password: str = None
+
+    results = re.search(
+        r'^(?P<user>[a-zA-Z0-9_-]+):(?P<password>[a-zA-Z0-9_-]+)@\S+$',
+        netloc_str)
+
+    return Netloc(
+        user = results.group('user'),
+        password = results.group('password'))
+
+
+def mysql(connection):
+    return [
+        'mysql',
+        '--no-auto-rehash',
+        '--host', connection.host,
+        '--user', connection.user,
+        '--port', str(connection.port or 3306),
+        '--database', connection.database,
+        f"-p{connection.password}",
+    ]
+
+
+def postgres(connection):
+    return ['psql', connection.url]
+
+
+if __name__ == '__main__':
+    main()
