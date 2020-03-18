@@ -46,8 +46,11 @@ class Connection:
             'mysql': mysql,
             'postgres': postgres,
         }
+        args = types[self.engine](self)
 
-        os.execvp(self.engine, types[self.engine](self))
+        print(args)
+
+        os.execvp(self.engine, args)
 
 
 def parse_netloc(netloc_str):
