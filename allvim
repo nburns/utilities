@@ -1,2 +1,24 @@
 #!/usr/bin/env fish
-duti -s (osascript -e "id of app \"Macvim\"") public.plain-text all
+if not which duti > /dev/null
+    brew install duti
+end
+
+set editor (osascript -e 'id of app "Macvim"')
+
+# find content type bundle id with
+# mdls -name kMDItemContentTypeTree FILE_NAME
+
+duti -vs "$editor" org.vim.cfg-file all
+duti -vs "$editor" public.plain-text all
+duti -vs "$editor" public.ruby-script all
+duti -vs "$editor" public.shell-script all
+duti -vs "$editor" public.text all
+duti -vs "$editor" public.yaml all
+duti -vs "$editor" net.daringfireball.markdown all
+duti -vs "$editor" public.plain-text all
+duti -vs "$editor" erb all
+duti -vs "$editor" snippets all
+duti -vs "$editor" rake all
+duti -vs "$editor" jsx all
+duti -vs "$editor" go all
+
