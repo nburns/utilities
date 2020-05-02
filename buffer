@@ -1,0 +1,89 @@
+#!/usr/bin/env python
+import argparse
+import os
+import sys
+import pathlib
+
+
+def main():
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument(
+        '--list',
+        action='store_true',
+        default=False,
+        help='list all buffers')
+
+    parser.add_argument(
+        '--append',
+        action='store_true',
+        default=False,
+        help='append instead of overwrite')
+
+    parser.add_argument(
+        '--root',
+        default='/tmp/buffer',
+        help='the directory to store buffers in')
+
+    parser.add_argument(
+        '--clear',
+        action='store_true',
+        default=False,
+        help='delete all existing buffers')
+
+    parser.add_argument(
+        'buffer_name',
+        default='default',
+        nargs='?',
+        help='the name of the buffer to read or write')
+
+    args = parser.parse_args()
+
+    if args.list:
+        [print(p) for p in list_dir(args.root)]
+        return
+
+    if args.clear:
+        [os.remove(p) for p in list_dir(args.root)]
+        return
+
+    buffer_path = os.path.join(args.root, args.buffer_name)
+
+    if sys.stdin.isatty():
+        cat(buffer_path)
+    else:
+        ensure_root(args.root)
+        tee(buffer_path)
+
+
+def cat(path):
+    try:
+        with open(path, 'r') as f:
+            for line in f:
+                sys.stdout.write(line)
+    except FileNotFoundError:
+        return
+
+
+def tee(path):
+    with open(path, 'w') as f:
+        for line in sys.stdin:
+            sys.stdout.write(line)
+            f.write(line)
+
+
+def ensure_root(root):
+    pathlib.Path(root).mkdir(parents=True, exist_ok=True)
+
+
+def list_dir(root):
+    try:
+        files = os.listdir(root)
+    except FileNotFoundError:
+        return []
+    else:
+        return [os.path.join(root, f) for f in files]
+
+
+if __name__ == '__main__':
+    main()

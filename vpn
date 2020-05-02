@@ -1,0 +1,52 @@
+#!/usr/bin/env python
+from IPython import embed
+from subprocess import Popen, TimeoutExpired, PIPE, STDOUT, check_output
+import threading
+import queue
+
+
+def get_password():
+    return check_output(
+        "sudo security find-generic-password -gs chi-vpn 2>&1 | grep password | cut -d '\"' -f 2",
+        shell=True).decode('utf8').strip()
+
+
+def start_vpn():
+    process = Popen(
+        ['newrelic-chi-vpn'],
+        stdin=PIPE,
+        stdout=PIPE,
+        stderr=STDOUT)
+
+    res = process.communicate(input=bytes(get_password(), 'utf8'))
+    embed()
+    return process
+
+print(start_vpn())
+
+
+def begin_vpn():
+    process = Popen(['newrelic-chi-vpn'], stdout=PIPE, bufsize=1)
+
+    output_queue = queue.Queue()
+
+    def enqueue(output):
+        (output_queue.put(line) for line in iter(out.readline, b''))
+        out.close()
+
+    thread = threading.Thread(target=enqueue, args=(process.stdout))
+    thread.daemon = True
+
+    thread.start()
+
+    while thread.is_alive():
+        try:
+            line = output_queue.get_nowait()
+        except queue.Empty:
+            print('empty')
+        else:
+            print(line)
+
+
+
+

@@ -25,6 +25,7 @@ associate net.daringfireball.markdown
 associate org.vim.cfg-file
 associate public.c-plus-plus-source
 associate public.c-source
+associate public.c-header
 associate public.data
 associate public.plain-text
 associate public.python-script
@@ -40,8 +41,10 @@ associate cpp
 associate dot
 associate erb
 associate go
+associate h
 associate jsx
 associate py
 associate rake
 associate rb
 associate snippets
+associate pgsql

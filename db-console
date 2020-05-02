@@ -24,7 +24,7 @@ def main():
         engine=url.scheme,
         user=netloc.user,
         password=netloc.password,
-        url=url,
+        url=args.url,
     )
 
     connection.connect()
@@ -63,8 +63,8 @@ def parse_netloc(netloc_str):
         netloc_str)
 
     return Netloc(
-        user = results.group('user'),
-        password = results.group('password'))
+        user=results.group('user'),
+        password=results.group('password'))
 
 
 def mysql(connection):
