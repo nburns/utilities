@@ -7,18 +7,19 @@ require 'json'
 # {'a' => 1}.a    1
 # {}.a!           NoMethodError
 class Hash
-  def method_missing(m, *args, &block)
-    return self[m] if self.key?(m)
-    return self[m.to_s] if self.key?(m.to_s)
-    return super if m.to_s.end_with?('!')
+  def method_missing(_method, *_args)
+    str = m.to_s
+
+    return self[str] if key?(str)
+    return self[m] if key?(m)
+    return send(str.slice(0, str.count).to_sym) if str.end_with?('!')
+
     nil
   end
 end
 
 d = data = JSON.parse(STDIN.read)
 
-context = (proc {}).binding
-
-result = context.eval(ARGV.join(' '))
+result = binding.eval(ARGV.join(' '))
 
 puts JSON.pretty_generate(result)
