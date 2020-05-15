@@ -1,3 +1,0 @@
-#!/usr/bin/env fish
-fork hide-pyc > /dev/null
-fork ctags -R --languages=python > /dev/null

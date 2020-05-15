@@ -1,7 +1,0 @@
-#!/usr/bin/env fish
-switch (hostname -s)
-    case bernoulli
-        gotags -R /Users/nick/outbound/outbound/src/outbound > /Users/nick/outbound/outbound/src/outbound/tags
-    case '*'
-        echo "configure a tags engine"
-end

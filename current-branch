@@ -1,9 +1,0 @@
-#!/usr/bin/env fish
-set branch (git symbolic-ref HEAD 2> /dev/null)
-
-if [ -n "$branch" ]
-    echo -n (basename $branch)
-else
-    echo -n ''
-end
-

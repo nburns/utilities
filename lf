@@ -1,2 +1,0 @@
-#!/usr/bin/env fish
-ls -d $PWD/* $argv

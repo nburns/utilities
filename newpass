@@ -1,3 +1,0 @@
-#!/usr/bin/env fish
-openssl rand -base64 33 | tr -d '=' | pbcopy
-pbpaste

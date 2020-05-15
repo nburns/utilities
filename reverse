@@ -1,7 +1,0 @@
-#!/usr/bin/env python3
-
-from sys import argv
-
-argv.pop(0)
-argv.reverse()
-print(' '.join(arg for arg in argv))

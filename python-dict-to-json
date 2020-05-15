@@ -1,3 +1,0 @@
-#!/usr/bin/env fish
-
-sed 's/u\'/"/g' | sed 's/\'/"/g' | sed 's/True/true/g' | sed 's/False/false/g' | sed 's/None/null/g'

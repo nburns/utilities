@@ -1,8 +1,0 @@
-#!/usr/bin/env fish
-set e
-for a in $argv
-    set e $e $a
-end
-
-echo $e
-fish -c "$EDITOR $e"

@@ -1,7 +1,0 @@
-#!/usr/bin/env fish
-set tmp (mktemp)
-cat &0 > $tmp
-sqlformat --reindent $tmp
-cat $tmp
-rm $tmp
-

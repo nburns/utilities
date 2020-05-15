@@ -1,2 +1,0 @@
-#!/usr/bin/env fish
-mvim (which $argv)

@@ -1,2 +1,0 @@
-#!/usr/bin/env fish
-find -f $PATH -iname '*'$argv[1]'*' 2> /dev/null

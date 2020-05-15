@@ -1,3 +1,0 @@
-#!/usr/bin/env fish
-
-find . -iname '*.pyc' | xargs -P 8 -n 1 setfile -a V 
