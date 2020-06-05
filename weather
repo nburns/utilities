@@ -25,6 +25,7 @@ def forecasts():
     response.raise_for_status()
     return response.json()['properties']['periods']
 
+
 def forcast_str(forecast):
     return f'''
     {forecast['name']}: {forecast['temperature']}{forecast['temperatureUnit']}
@@ -34,7 +35,7 @@ def forcast_str(forecast):
 
 
 if papirus:
-    screen = PapirusText()
+    screen = papirus.PapirusText()
 
     def printer(string):
         screen.write(string)
