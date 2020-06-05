@@ -1,0 +1,51 @@
+#!/usr/bin/env python3
+import requests
+
+try:
+    import papirus
+except ImportError:
+    papirus = None
+
+latitude = '45.489938'
+longitude = '-122.690453'
+
+session = requests.Session()
+session.headers.update({'User-Agent': 'nicks-weather-script'})
+
+
+def forecast_url(latitude, longitude):
+    response = session.get(
+        f'https://api.weather.gov/points/{latitude},{longitude}')
+    response.raise_for_status()
+    return response.json()['properties']['forecast']
+
+
+def forecasts():
+    response = session.get(forecast_url(latitude, longitude))
+    response.raise_for_status()
+    return response.json()['properties']['periods']
+
+
+def print_forcast(forecast):
+    print(forecast['name'])
+    print(str(forecast['temperature']) + forecast['temperatureUnit'])
+    print(forecast['windSpeed'])
+    print(forecast['detailedForecast'])
+    print()
+
+
+def papirus_forcast(forecast):
+    screen = papirus.PapirusText()
+    screen.write(forecast['name'])
+    screen.write(forecast['name'])
+    screen.write(str(forecast['temperature']) + forecast['temperatureUnit'])
+    screen.write(forecast['windSpeed'])
+    screen.write(forecast['detailedForecast'])
+    screen.write()
+
+
+for forecast in forecasts()[:2]:
+    if papirus:
+        papirus_forcast(forecast)
+    else:
+        print_forcast(forecast)
