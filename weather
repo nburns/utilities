@@ -35,13 +35,15 @@ def forcast_str(forecast):
 
 
 if papirus:
-    screen = papirus.PapirusText()
+    screen = papirus.PapirusTextPos()
 
     def printer(string):
-        screen.write(string)
+        screen.Clear()
+        screen.AddText(string)
+        screen.WriteAll()
 else:
     def printer(string):
         print(string)
 
-for forecast in forecasts()[:2]:
-    printer(forcast_str(forecast))
+output = ''.join([forcast_str(f) for f in forecasts()[:2]])
+printer(output)
