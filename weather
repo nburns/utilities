@@ -25,27 +25,22 @@ def forecasts():
     response.raise_for_status()
     return response.json()['properties']['periods']
 
+def forcast_str(forecast):
+    return f'''
+    {forecast['name']}: {forecast['temperature']}{forecast['temperatureUnit']}
+    {forecast['windSpeed']}
+    {forecast['detailedForecast']}
+    '''
 
-def print_forcast(forecast):
-    print(forecast['name'])
-    print(str(forecast['temperature']) + forecast['temperatureUnit'])
-    print(forecast['windSpeed'])
-    print(forecast['detailedForecast'])
-    print()
 
+if papirus:
+    screen = PapirusText()
 
-def papirus_forcast(forecast):
-    screen = papirus.PapirusText()
-    screen.write(forecast['name'])
-    screen.write(forecast['name'])
-    screen.write(str(forecast['temperature']) + forecast['temperatureUnit'])
-    screen.write(forecast['windSpeed'])
-    screen.write(forecast['detailedForecast'])
-    screen.write()
-
+    def printer(string):
+        screen.write(string)
+else:
+    def printer(string):
+        print(string)
 
 for forecast in forecasts()[:2]:
-    if papirus:
-        papirus_forcast(forecast)
-    else:
-        print_forcast(forecast)
+    printer(forcast_str(forecast))
