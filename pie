@@ -12,7 +12,7 @@ else
 end
 
 
-set matched_files (ack "$MATCH" | nocolor | cut -d : -f 1 | sort -u)
+set matched_files (ack "$MATCH" | nocolor | cut -d : -f 1 | sort -u | sed '/^\s*$/d')
 set matched_files_count (count $matched_files)
 
 echo (color -f red "Search regex $MATCH matches $matched_files_count files")
@@ -23,6 +23,7 @@ if [ -z "$REGEX" ]
 end
 
 for i in (seq 1 $matched_files_count)
+    echo $matched_files[$i]
     perl -pi -e "$REGEX" $matched_files[$i]
 end
 
