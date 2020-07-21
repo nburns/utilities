@@ -1,0 +1,197 @@
+#!/usr/bin/env python3
+from dataclasses import dataclass
+import argparse
+import json
+import re
+import sys
+
+import requests
+import http.cookiejar as cookiejar
+from bs4 import BeautifulSoup
+from IPython import embed
+
+
+def subclasses(cls):
+    for subclass in cls.__subclasses__():
+        yield from subclasses(subclass)
+        yield subclass
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--cookies-file')
+    parser.add_argument('--season-url')
+    args = parser.parse_args()
+
+    shows = [show_cls
+             for show_cls
+             in subclasses(Show)
+             if show_cls.matches(args.season_url)]
+
+    if len(shows) != 1:
+        sys.exit(f"Undetermined show {shows}")
+
+    show_cls = shows[0]
+
+    cookies = cookiejar.MozillaCookieJar(args.cookies_file)
+    cookies.load()
+
+    def get(url, raw=False):
+        response = requests.get(url, cookies=cookies)
+        response.raise_for_status()
+        if raw:
+            return response.text
+        return BeautifulSoup(response.text, features='html.parser')
+
+    show = show_cls(get, args.season_url)
+
+    print(f"Show: {show.series_name}", file=sys.stderr)
+
+    episodes = show.build_episodes()
+
+    for e in episodes:
+        print(e.command(get=get, cookies_file=args.cookies_file))
+
+
+class Show:
+    url_re = None
+    series_name = None
+
+    @classmethod
+    def matches(cls, url):
+        return bool(re.search(cls.url_re, url))
+
+    def __init__(self, get, url):
+        self.get = get
+        self.url = url
+
+    def build_episodes(self):
+        raise NotImplementedError
+
+    def html(self):
+        return self.get(self.url)
+
+
+class ThisOldHouse(Show):
+    url_re = 'www.thisoldhouse.com/.*(!ask-toh)-episodes'
+    series_name = 'This Old House'
+
+    def build_episodes(self):
+        sections = self.html().find_all('h2', class_="c-entry-box--compact__title")
+
+        if not scripts or len(scripts) != 1:
+            raise RuntimeError(f'undetermined script on {url}')
+
+        return scripts[0].get('src')
+        anchors = [s.find_all('a')[0] for s in sections]
+
+        for anchor in anchors:
+            results = re.search(
+                r'^S(?P<season>[\d]+) E(?P<episode>[\d]+): (?P<episode_name>.*)$',
+                anchor.text)
+
+            episode_name = anchor.text
+
+            if results:
+                ep = results.group('episode_name')
+                if ep == self.series_name:
+                    # some episodes have the same name as the series
+                    episode_name = None
+                else:
+                    episode_name = ep
+
+            yield Episode(
+                series_name=self.series_name,
+                season=results.group('season') if results else None,
+                episode=results.group('episode') if results else None,
+                episode_name=episode_name,
+                video_url=self.video_url(anchor.get('href')))
+
+    def video_url(self, url):
+        html = self.get(url)
+
+        def is_video(iframe):
+            src = iframe.get('src')
+            if src:
+                return 'videos' in src
+            return False
+
+        video_iframes = [f for f in html.find_all('iframe') if is_video(f)]
+
+        if len(video_iframes) != 1:
+            raise RuntimeError(f"Unable to determine iframe on {url}")
+
+        return video_iframes[0].get('src')
+
+
+class NewYankeeWorkshop(ThisOldHouse):
+    url_re = 'new-yankee-workshop'
+    series_name = 'The New Yankee Workshop'
+
+
+class AskThisOldHouse(ThisOldHouse):
+    url_re = 'ask-toh'
+    series_name = 'Ask This Old House'
+
+
+class TheFrenchChef(Show):
+    url_re = 'french-chef-julia-child'
+    series_name = 'The French Chef'
+
+    def build_episodes(self):
+        sections = self.html().find_all('h3', class_="video-summary__title")
+        anchors = [s.find_all('a')[0] for s in sections]
+        for anchor in anchors:
+            yield Episode(
+                series_name=self.series_name,
+                episode_name=re.sub(r'\s+', ' ', anchor.text).strip(' '),
+                video_url='https://pbs.org' + anchor.get('href'))
+
+
+class Nova(Show):
+    url_re = 'nova'
+    series_name = 'Nova'
+
+    def build_episodes(self):
+        script = self.html().find('script', id='__NEXT_DATA__')
+        data = json.loads(list(script.children)[0])
+        embed()
+        episodes = data['props']['pageProps']['data']['episodes']
+        for episode in episodes:
+            iframe = BeautifulSoup(
+                episode['episode']['assets'][0]['player_code'],
+                features='html.parser').find('iframe')
+
+            yield Episode(
+                series_name=self.series_name,
+                episode_name=episode['episode']['title'],
+                video_url="https:" + iframe.get('src'))
+
+
+@dataclass
+class Episode:
+    video_url: str
+    series_name: str
+    episode_name: str
+    season: str = None
+    episode: str = None
+
+    def command(self, get=None, cookies_file=None):
+        outfile_parts = [
+            self.series_name,
+            f'S{self.season}' if self.season else None,
+            f'E{self.episode}' if self.episode else None,
+            (self.episode_name or '') + '.%(ext)s'
+        ]
+
+        outfile = ' '.join(p for p in outfile_parts if p)
+
+        return ' '.join([
+            'youtube-dl', f"'{self.video_url}'",
+            f"-o '{outfile}'",
+            f'--cookies "{cookies_file}"'
+        ])
+
+
+if __name__ == '__main__':
+    main()
