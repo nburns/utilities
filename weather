@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 import requests
 
+import inspect
+
 try:
     import papirus
 except ImportError:
@@ -11,6 +13,7 @@ longitude = '-122.690453'
 
 session = requests.Session()
 session.headers.update({'User-Agent': 'nicks-weather-script'})
+# https://www.weather.gov/documentation/services-web-api
 
 
 def forecast_url(latitude, longitude):
@@ -27,11 +30,10 @@ def forecasts():
 
 
 def forcast_str(forecast):
-    return f'''
-    {forecast['name']}: {forecast['temperature']}{forecast['temperatureUnit']}
-    {forecast['windSpeed']}
+    return inspect.cleandoc(f'''
+    {forecast['name']}: {forecast['temperature']}{forecast['temperatureUnit']} {forecast['windSpeed']}
     {forecast['detailedForecast']}
-    '''
+    ''')
 
 
 if papirus:
@@ -45,5 +47,5 @@ else:
     def printer(string):
         print(string)
 
-output = ''.join([forcast_str(f) for f in forecasts()[:2]])
+output = '\n'.join([forcast_str(f) for f in forecasts()[:2]])
 printer(output)
