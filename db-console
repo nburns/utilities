@@ -48,6 +48,7 @@ class Connection:
         args = types[self.engine](self)
 
         print(args)
+        print(' '.join(args))
 
         os.execvp(self.engine, args)
 

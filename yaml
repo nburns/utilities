@@ -3,6 +3,8 @@ import sys
 import argparse
 import json
 
+import pyaml
+
 try:
     import yaml
 except ImportError:
@@ -29,8 +31,7 @@ def main():
 
     else:
         def dump(data):
-            return yaml.dump(data,
-                             default_flow_style=False)
+            return pyaml.dump(data)
 
     if args.file_path:
         data_file = open(args.file_path, 'r')

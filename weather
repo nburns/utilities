@@ -43,6 +43,7 @@ if papirus:
         screen.Clear()
         screen.AddText(string)
         screen.WriteAll()
+        print(string)
 else:
     def printer(string):
         print(string)

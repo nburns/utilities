@@ -1,0 +1,9 @@
+#!/usr/bin/env fish
+find ~/code -type d -maxdepth 1 -mindepth 1 | parallel -j 20 update-git-repo
+
+pushd ~/code/schema
+for schema in (find ~/code -maxdepth 3 -mindepth 3 -name '*schema.rb')
+    set link (echo $schema | sed -e "s#$HOME/code/##g" -e 's#/#--#g')
+    ln -Fs "$schema" "./$link"
+end
+popd

@@ -3,8 +3,10 @@ import json
 import sys
 import pprint
 
+
 def headers(entry):
-    return ' '.join(["-H '{}: {}'".format(d['name'], d['value']) for d in entry['request']['headers']])
+    return ' '.join(["-H '{}: {}'".format(d['name'], d['value'])
+                     for d in entry['request']['headers']])
 
 
 def method(entry):
@@ -13,8 +15,9 @@ def method(entry):
 
 def cookies(entry):
     cookies = merge_dicts(entry['request']['cookies'])
-        
-    return '--cookie "' + '; '.join(['{}:{}'.format(k, v) for k, v in cookies.items()]) + '"'
+
+    return '--cookie "' + '; '.join(['{}:{}'.format(k, v)
+                                     for k, v in cookies.items()]) + '"'
 
 
 def merge_dicts(dicts):
@@ -23,13 +26,22 @@ def merge_dicts(dicts):
     return d
 
 
+def response(entry):
+    response = entry['response']
+    return f'# {response["status"]}'
+
+
+def command(entry):
+    return f"curl -v {entry['request']['url']} {method(entry)} {headers(entry)} {cookies(entry)}"
+
+
 def main():
     har_text = sys.stdin.read()
     har = json.loads(har_text)
 
     for entry in har['log']['entries']:
-        command = ['curl', '-v', entry['request']['url'], method(entry), headers(entry), cookies(entry)]
-        print(' '.join(command))
+        print(command(entry))
+        print(response(entry))
         print()
 
 
