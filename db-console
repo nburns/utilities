@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from dataclasses import dataclass
 from urllib.parse import urlparse
+from inspect import cleandoc
 
 import argparse
 import os
@@ -9,8 +10,9 @@ import re
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        'url', default=None, help="A database connection url")
+    parser.add_argument('url', default=None, help="A database connection url")
+    parser.add_argument('--fdw', default=False, action='store_true', help="generate psql fdw commands for the url")
+    parser.add_argument('--connect', default=True, action='store_true', help="open an interactive session to the db")
 
     args = parser.parse_args()
 
@@ -19,26 +21,125 @@ def main():
 
     connection = Connection(
         host=url.hostname,
-        port=url.port,
+        raw_port=url.port,
         database=url.path.lstrip('/'),
-        engine=url.scheme,
+        raw_engine=url.scheme,
         user=netloc.user,
         password=netloc.password,
         url=args.url,
     )
+    if args.fdw:
+        print(connection.generate_fdw())
+        return
 
-    connection.connect()
+    if args.connect:
+        connection.connect() # process replacement
+
 
 
 @dataclass
 class Connection:
     user: str = None
     host: str = None
-    port: int = None
+    raw_port: int = None
     password: str = None
     database: str = None
-    engine: str = None
+    raw_engine: str = None
     url: str = None
+
+    @property
+    def port(self):
+        return self.raw_port or {
+            'postgres': 5432
+        }[self.engine]
+
+    @property
+    def engine(self):
+        if "post" in self.raw_engine or "psql" in self.raw_engine:
+            return 'postgres'
+
+        if "mysql" in self.raw_engine:
+            return 'mysql'
+
+    @property
+    def wrapper(self):
+        return {
+            'postgres': 'postgres_fdw',
+            'mysql': 'mysql_fdw',
+        }[self.engine]
+
+    def generate_fdw(self):
+        server_name = self.database
+
+        def format_options(options):
+            formatted = []
+            for key in options:
+                formatted.append(f"{key} '{options[key]}'")
+            return ', '.join(formatted)
+
+        return cleandoc(f'''
+            CREATE EXTENSION IF NOT EXISTS citext;
+            CREATE EXTENSION IF NOT EXISTS postgres_fdw;
+            CREATE EXTENSION IF NOT EXISTS mysql_fdw;
+
+            DROP SERVER IF EXISTS "{server_name}" CASCADE;
+
+            CREATE SERVER "{server_name}" FOREIGN DATA WRAPPER {self.wrapper} options (
+                {format_options(self.fdw_options['server'])}
+            );
+
+            CREATE USER MAPPING FOR CURRENT_USER SERVER "{server_name}" options (
+                {format_options(self.fdw_options['user'])}
+            );
+
+            DROP SCHEMA IF EXISTS "{self.schema_name}";
+            CREATE SCHEMA "{self.schema_name}";
+
+            IMPORT FOREIGN SCHEMA "{self.foreign_schema_name}"
+            EXCEPT (
+                all_permissions, column_permissions, database_permissions,
+                function_permissions, permission_target, schema_permissions,
+                sequence_permissions, table_permissions, view_permissions
+            )
+            FROM SERVER "{server_name}" INTO "{self.schema_name}";
+        ''')
+
+    @property
+    def fdw_options(self):
+        return {
+          'postgres': {
+              'server': {
+                  'host': self.host,
+                  'dbname': self.database,
+                  'port': self.port,
+              },
+              'user': {
+                  'user': self.user,
+                  'password': self.password,
+              },
+          },
+          'mysql': {
+              'server': {
+                  'host': self.host,
+                  'port': self.port,
+              },
+              'user': {
+                  'username': self.user,
+                  'password': self.password,
+              },
+          },
+        }[self.engine]
+
+    @property
+    def schema_name(self):
+        return self.database
+
+    @property
+    def foreign_schema_name(self):
+        return {
+            'postgres': 'public',
+            'mysql': self.database,
+        }[self.engine]
 
     def connect(self):
         types = {
@@ -48,6 +149,7 @@ class Connection:
         args = types[self.engine](self)
 
         print(args)
+        print(' '.join(args))
 
         os.execvp(self.engine, args)
 
@@ -59,7 +161,7 @@ def parse_netloc(netloc_str):
         password: str = None
 
     results = re.search(
-        r'^(?P<user>[a-zA-Z0-9_-]+):(?P<password>[a-zA-Z0-9_-]+)@\S+$',
+        r'^(?P<user>[a-zA-Z0-9_-]+):(?P<password>[a-zA-Z0-9_\-%&]+)@\S+$',
         netloc_str)
 
     return Netloc(

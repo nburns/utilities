@@ -6,6 +6,7 @@ try:
 except ImportError:
     print('pip install flask')
 
+from IPython import embed
 from werkzeug.routing import Rule
 
 os.environ['FLASK_ENV'] = os.environ.get('FLASK_ENV', 'development')
@@ -13,11 +14,14 @@ os.environ['FLASK_ENV'] = os.environ.get('FLASK_ENV', 'development')
 app = Flask(__name__)
 app.url_map.add(Rule('/echo', endpoint='echo'))
 app.url_map.add(Rule('/headers', endpoint='headers'))
+app.url_map.add(Rule('/headers/<id>', endpoint='headers'))
 
 
 @app.endpoint("headers")
-def headers():
-    return jsonify(dict(request.headers))
+def headers(**kwargs):
+    headers = dict(request.headers)
+    print(headers)
+    return jsonify(headers)
 
 
 @app.endpoint("echo")
@@ -35,7 +39,7 @@ def echo():
 
 
 def main():
-    app.run(debug=True)
+    app.run(debug=True, port=9292)
 
 
 if __name__ == '__main__':

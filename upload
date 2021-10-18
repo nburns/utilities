@@ -1,0 +1,42 @@
+#!/usr/bin/env ruby
+require 'open3'
+require 'rollbar'
+
+def torrent_dir
+  ENV.fetch('TR_TORRENT_DIR')
+end
+
+def torrent_name
+  ENV.fetch('TR_TORRENT_NAME')
+end
+
+def torrent_path
+  "#{torrent_dir}/#{torrent_dir}"
+end
+
+def size(path)
+  `du -s #{path} | cut -f 1`.strip
+end
+
+def with_reporting
+  yield
+rescue StandardError => e
+  Rollbar.error(e)
+end
+
+def upload
+  size = size(torrent_path)
+  started = Time.now
+  Rollbar.info("started upload", torrent_name: torrent_name, size: size)
+  `~/dropbox_uploader.sh upload #{torrent_path} #{torrent_name}`
+  elapsed_seconds = Time.now - started
+  Rollbar.info("finished upload", torrent_name: torrent_name, size: size, avg_bytes_per_sec: size / elapsed_seconds)
+end
+
+def configure_rollbar
+  Rollbar.configure do |config|
+    config.access_token = ENV.fetch('ROLLBAR_ACCESS_TOKEN')
+  end
+end
+
+with_reporting { upload }

@@ -8,39 +8,50 @@ try:
 except ImportError:
     sys.exit('pip install simplejson')
 
+
 def error_print(data, error):
     stderr = functools.partial(print, file=sys.stderr)
 
     stderr('\n{}\n'.format(error))
     line = data.split('\n')[error.lineno - 1]
     error_line = [
-            '^' if error.colno - 1 == i else '-' for i, c in enumerate(line)]
+        '^' if error.colno - 1 == i else '-' for i, c in enumerate(line)]
     stderr(line)
     stderr(''.join(error_line))
 
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('-k', '--keys-only', action='store_true', default=False,
+    parser.add_argument(
+        '-k',
+        '--keys-only',
+        action='store_true',
+        default=False,
         help='print top level keys')
     parser.add_argument('-d', '--data', type=str, default=None,
-        help='pass a json string as an argument')
+                        help='pass a json string as an argument')
     parser.add_argument('-u', '--unescape', action='store_true', default=False,
-        help='unescape input before deserialization')
+                        help='unescape input before deserialization')
     parser.add_argument('-c', '--compact', action='store_true', default=False,
-        help='print compactly (do not pretty print)')
-    parser.add_argument('-l', '--line-by-line', action='store_true', default=False,
+                        help='print compactly (do not pretty print)')
+    parser.add_argument(
+        '-l',
+        '--line-by-line',
+        action='store_true',
+        default=False,
         help='treat each line as its own json document')
 
     args = parser.parse_args()
-
 
     if args.data:
         data = [args.data]
     elif args.line_by_line:
         data = [line for line in sys.stdin]
     else:
-        data = [sys.stdin.read()]
+        try:
+            data = [sys.stdin.read()]
+        except UnicodeDecodeError:
+            sys.exit(1)
 
     if args.unescape:
         data = [str.encode(d).decode('unicode_escape') for d in data]
@@ -57,13 +68,14 @@ def main():
                 print(k)
 
         else:
-            output_options = { 'ensure_ascii': True, 'sort_keys': True }
+            output_options = {'ensure_ascii': True, 'sort_keys': True}
 
             if not args.compact:
-                output_options.update({ 'indent': 4, 'separators': (',', ': ') })
+                output_options.update({'indent': 4, 'separators': (',', ': ')})
 
             simplejson.dump(parsed, sys.stdout, **output_options)
             print()
+
 
 if __name__ == '__main__':
     main()

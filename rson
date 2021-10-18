@@ -5,14 +5,16 @@ require 'json'
 # {}.a            nil
 # {a: 1}.a        1
 # {'a' => 1}.a    1
-# {}.a!           NoMethodError
+# {}.a!           NoMethodError  force an error if the thing does not implement that method
 class Hash
-  def method_missing(_method, *_args)
-    str = m.to_s
+  def method_missing(method, *_args)
+    return self[method] if key?(method) # indifferent access
 
-    return self[str] if key?(str)
-    return self[m] if key?(m)
-    return send(str.slice(0, str.count).to_sym) if str.end_with?('!')
+    name = method.to_s
+
+    return self[name] if key?(name)
+
+    return send(name.slice(0, name.length).to_sym) if name.end_with?('!')
 
     nil
   end
@@ -20,6 +22,6 @@ end
 
 d = data = JSON.parse(STDIN.read)
 
-result = binding.eval(ARGV.join(' '))
+result = binding.eval('data' + ARGV.join(' '))
 
 puts JSON.pretty_generate(result)

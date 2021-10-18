@@ -39,7 +39,7 @@ http {
         }
     }
 }" > "$conf_file"
-
+echo "$conf_file"
 nginx -c "$conf_file"
 
 rm "$conf_file"

@@ -1,2 +1,8 @@
-#!/usr/bin/env ruby
-puts $stdin.read.strip.split('').group_by(&:itself).keys.count
+File.open("/dev/fd/0", "rb")
+  .readlines
+  .strip
+  .split("")
+  .group_by { |c| c }
+  .map { |(k, v)| [k, v.size] }
+  .sort_by { |(k, v)| k.to_s }
+  .each { |(k, v)| puts "#{k}\t#{v}"}

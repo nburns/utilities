@@ -1,13 +1,8 @@
 #!/usr/bin/env python3
 import sys
-import html.parser
-
-def htmldecode(string):
-    parser = html.parser.HTMLParser()
-    return parser.unescape(string)
-
+import html
 
 strings = sys.argv[1:] if sys.argv[1:] else sys.stdin.readlines()
 
 for string in strings:
-    print(htmldecode(string))
+    print(html.unescape(string))

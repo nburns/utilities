@@ -1,0 +1,20 @@
+#!/usr/bin/env fish
+cd $argv
+
+if not git rev-parse --is-inside-work-tree 2> /dev/null >/dev/null
+    echo (color -f red 'not a git repo '(pwd))
+    exit
+end
+
+if git diff --exit-code
+    git checkout master --quiet > /dev/null
+    if git pull --quiet 2> /dev/null > /dev/null
+        echo (color -f green 'refreshed '(pwd))
+        exit
+    else
+        echo (color -f red 'failed to pull '(pwd))
+    end
+else
+    echo (color -f red 'changes in '(pwd))
+end
+

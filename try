@@ -1,0 +1,8 @@
+#!/usr/bin/env fish
+for line in (cat /dev/stdin)
+    if set result (echo $line | eval $argv[1] 2>&1)
+        echo $result
+    else
+        echo $line
+    end
+end
