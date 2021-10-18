@@ -14,6 +14,10 @@ def torrent_path
   "#{torrent_dir}/#{torrent_dir}"
 end
 
+def size(path)
+  `du -s #{path} | cut -f 1`.strip
+end
+
 def with_reporting
   yield
 rescue StandardError => e
@@ -21,9 +25,12 @@ rescue StandardError => e
 end
 
 def upload
-  Rollbar.info("started upload", torrent_name: torrent_name)
-  Open3.popen3("~/dropbox_uploader.sh upload #{torrent_path} #{torrent_name}")
-  Rollbar.info("finished upload", torrent_name: torrent_name)
+  size = size(torrent_path)
+  started = Time.now
+  Rollbar.info("started upload", torrent_name: torrent_name, size: size)
+  `~/dropbox_uploader.sh upload #{torrent_path} #{torrent_name}`
+  elapsed_seconds = Time.now - started
+  Rollbar.info("finished upload", torrent_name: torrent_name, size: size, avg_bytes_per_sec: size / elapsed_seconds)
 end
 
 def configure_rollbar
@@ -32,4 +39,4 @@ def configure_rollbar
   end
 end
 
-
+with_reporting { upload }
