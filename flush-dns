@@ -1,3 +1,4 @@
 #!/usr/bin/env fish
 sudo dscacheutil -flushcache
+sudo killall mDNSResponderHelper
 sudo killall -HUP mDNSResponder

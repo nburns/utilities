@@ -15,6 +15,12 @@ def main():
         help='list all buffers')
 
     parser.add_argument(
+        '--print-file-path',
+        action='store_true',
+        default=False,
+        help='print the path to the file for the corresponding buffer')
+
+    parser.add_argument(
         '--append',
         action='store_true',
         default=False,
@@ -23,7 +29,7 @@ def main():
     parser.add_argument(
         '--root',
         default='/tmp/buffer',
-        help='the directory to store buffers in')
+        help='the directory to store buffers in (default: /tmp/buffer)')
 
     parser.add_argument(
         '--clear',
@@ -50,26 +56,34 @@ def main():
     buffer_path = os.path.join(args.root, args.buffer_name)
 
     if sys.stdin.isatty():
-        cat(buffer_path)
+        cat(buffer_path, print_file_path=args.print_file_path)
     else:
         ensure_root(args.root)
-        tee(buffer_path)
+        tee(buffer_path, print_file_path=args.print_file_path)
 
 
-def cat(path):
+
+def cat(path, print_file_path = False):
     try:
         with open(path, 'r') as f:
-            for line in f:
-                sys.stdout.write(line)
+            if print_file_path:
+                print(path)
+            else:
+                for line in f:
+                    sys.stdout.write(line)
     except FileNotFoundError:
         return
 
 
-def tee(path):
+def tee(path, print_file_path = False):
     with open(path, 'w') as f:
         for line in sys.stdin:
-            sys.stdout.write(line)
+            if not print_file_path:
+                sys.stdout.write(line)
             f.write(line)
+
+        if print_file_path:
+            print(path)
 
 
 def ensure_root(root):
