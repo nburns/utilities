@@ -1,6 +1,6 @@
 #!/usr/bin/env ruby
 require 'rollbar'
-require 'dotenv/load'
+require 'dotenv'
 require 'logger'
 
 LOG = Logger.new(File.open("#{ENV.fetch('HOME')}/upload.log", "w"))
@@ -55,6 +55,7 @@ def configure_rollbar
 end
 
 begin
+  Dotenv.load("#{ENV.fetch('HOME')}/.env")
   configure_rollbar
   with_reporting { upload }
 rescue StandardError => e
