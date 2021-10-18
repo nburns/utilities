@@ -3,7 +3,7 @@ require 'rollbar'
 require 'dotenv'
 require 'logger'
 
-LOG = Logger.new(File.open("#{ENV.fetch('HOME')}/upload.log", "w"))
+LOG = Logger.new(File.open("#{ENV.fetch('HOME')}/upload.log", "a+"))
 
 class UploadFailure < StandardError; end
 
