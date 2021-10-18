@@ -2,6 +2,8 @@
 require 'open3'
 require 'rollbar'
 
+class UploadFailure < StandardError; end
+
 def torrent_dir
   ENV.fetch('TR_TORRENT_DIR')
 end
@@ -11,26 +13,36 @@ def torrent_name
 end
 
 def torrent_path
-  "#{torrent_dir}/#{torrent_dir}"
+  "#{torrent_dir}/#{torrent_name}"
 end
 
 def size(path)
-  `du -s #{path} | cut -f 1`.strip
+  `du -s #{path} | cut -f 1`.strip.to_i
 end
 
 def with_reporting
   yield
 rescue StandardError => e
   Rollbar.error(e)
+  raise e
 end
 
 def upload
   size = size(torrent_path)
   started = Time.now
-  Rollbar.info("started upload", torrent_name: torrent_name, size: size)
-  `~/dropbox_uploader.sh upload #{torrent_path} #{torrent_name}`
-  elapsed_seconds = Time.now - started
-  Rollbar.info("finished upload", torrent_name: torrent_name, size: size, avg_bytes_per_sec: size / elapsed_seconds)
+
+  Rollbar.info("started upload",
+    torrent_name: torrent_name, size: size)
+
+  success = system("~/dropbox_uploader.sh upload #{torrent_path} #{torrent_name}")
+  raise UploadFailure, "failed to upload #{torrent_name}"
+
+  seconds = Time.now - started
+  mbps = size / seconds / 1000.0
+  minutes = seconds / 60
+
+  Rollbar.info("finished upload",
+    torrent_name: torrent_name, size: size, mbps: mbps, minutes: minutes)
 end
 
 def configure_rollbar
@@ -39,4 +51,5 @@ def configure_rollbar
   end
 end
 
+configure_rollbar
 with_reporting { upload }
