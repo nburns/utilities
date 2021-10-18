@@ -1,0 +1,5 @@
+#!/usr/bin/env python3
+from os import getenv
+from os.path import join
+
+FILE = join(getenv(TR_TORRENT_DIR), getenv(TR_TORRENT_NAME))
