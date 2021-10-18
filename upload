@@ -34,7 +34,7 @@ def upload
     torrent_name: torrent_name, size: size)
 
   success = system("~/dropbox_uploader.sh upload #{torrent_path} #{torrent_name}")
-  raise UploadFailure, "failed to upload #{torrent_name}"
+  raise UploadFailure, "failed to upload #{torrent_name}" unless success
 
   seconds = Time.now - started
   mbps = size / seconds / 1000.0
