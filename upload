@@ -20,7 +20,7 @@ def torrent_path
 end
 
 def size(path)
-  `du -s #{path} | cut -f 1`.strip.to_i
+  `du -s "#{path}" | cut -f 1`.strip.to_i
 end
 
 def with_reporting
@@ -37,9 +37,12 @@ def upload
   Rollbar.info("started upload",
     torrent_name: torrent_name, size: size)
 
-  out = `~/dropbox_uploader.sh upload #{torrent_path} #{torrent_name}`
-  unless $?.exitstatus.zero?
-    raise UploadFailure, "failed to upload #{torrent_name} #{$?.exitstatus} #{out}"
+  stdout, stderr, status = Open3.capture3("~/dropbox_uploader.sh upload #{torrent_path} #{torrent_name}")
+
+  unless status.exitstatus.zero?
+    Rollbar.error("failed to upload",
+      stdout: stdout, stderr: stderr, status: status.exitstatus, torrent_name: torrent_name)
+    raise UploadFailure, "failed to upload"
   end
 
   seconds = Time.now - started
@@ -47,7 +50,8 @@ def upload
   minutes = seconds / 60
 
   Rollbar.info("finished upload",
-    torrent_name: torrent_name, size: size, mbps: mbps, minutes: minutes)
+    torrent_name: torrent_name, size: size, mbps: mbps, minutes: minutes
+    stdout: stdout, stderr: stderr)
 end
 
 def configure_rollbar
