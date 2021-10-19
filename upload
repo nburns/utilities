@@ -20,7 +20,7 @@ def torrent_path
 end
 
 def size(path)
-  `du -s #{path} | cut -f 1`.strip.to_i
+  `du -s "#{path}" | cut -f 1`.strip.to_i
 end
 
 def with_reporting
