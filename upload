@@ -37,8 +37,10 @@ def upload
   Rollbar.info("started upload",
     torrent_name: torrent_name, size: size)
 
-  success = system("~/dropbox_uploader.sh upload #{torrent_path} #{torrent_name}")
-  raise UploadFailure, "failed to upload #{torrent_name}" unless success
+  out = `~/dropbox_uploader.sh upload #{torrent_path} #{torrent_name}`
+  unless $?.exitstatus.zero?
+    raise UploadFailure, "failed to upload #{torrent_name} #{$?.exitstatus} #{out}"
+  end
 
   seconds = Time.now - started
   mbps = size / seconds / 1000.0
