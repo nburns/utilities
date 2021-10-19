@@ -1,4 +1,5 @@
 #!/usr/bin/env ruby
+require 'open3'
 require 'rollbar'
 require 'dotenv'
 require 'logger'
@@ -20,7 +21,12 @@ def torrent_path
 end
 
 def size(path)
-  `du -s "#{path}" | cut -f 1`.strip.to_i
+  stdout, stderr, status = Open3.capture3("du -s \"#{path}\" | cut -f 1")
+  if status.exitstatus.zero?
+    stdout.strip.to_i
+  else
+    raise stderr
+  end
 end
 
 def with_reporting
@@ -50,7 +56,7 @@ def upload
   minutes = seconds / 60
 
   Rollbar.info("finished upload",
-    torrent_name: torrent_name, size: size, mbps: mbps, minutes: minutes
+    torrent_name: torrent_name, size: size, mbps: mbps, minutes: minutes,
     stdout: stdout, stderr: stderr)
 end
 
