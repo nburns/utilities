@@ -69,11 +69,12 @@ def upload
     minutes: seconds / 60, finished: finished,
   )
 
-  unless status.exitstatus.zero?
-    raise UploadFailure.new("failed to upload", attrs)
+  if status.exitstatus.zero?
+    Rollbar.info("finished upload", attrs)
+  else
+    Rollbar.info("failed to upload", attrs)
   end
 
-  Rollbar.info("finished upload", attrs)
 end
 
 begin
