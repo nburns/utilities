@@ -41,7 +41,7 @@ end
 def with_reporting
   yield
 rescue StandardError => e
-  Rollbar.error(e, e.respond_to?(:attrs) ? e.attrs : {})
+  Rollbar.error(e, **(e.respond_to?(:attrs) ? e.attrs : {}))
   raise e
 end
 
