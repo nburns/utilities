@@ -47,11 +47,12 @@ end
 
 def upload
   size = size(torrent_path)
+  size_mb = size / (1000.0 * 1000.0)
   started = Time.now
 
   attrs = {
     torrent_path: torrent_path, torrent_name: torrent_name,
-    size: size, size_mb: size/1000.0,
+    size: size, size_mb: size_mb,
     started: started,
   }
 
@@ -66,7 +67,7 @@ def upload
 
   attrs.merge!(
     stdout: stdout, stderr: stderr, status: status.exitstatus,
-    mpbs: size / seconds / 1000.0,
+    mpbs: size_mb / seconds,
     minutes: seconds / 60, finished: finished,
   )
 
