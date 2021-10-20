@@ -3,10 +3,18 @@ require 'open3'
 require 'rollbar'
 require 'dotenv'
 require 'logger'
+require 'pry'
 
 LOG = Logger.new(File.open("#{ENV.fetch('HOME')}/upload.log", "a+"))
 
-class UploadFailure < StandardError; end
+class UploadFailure < StandardError
+  def initialize(msg, attrs)
+    super(msg)
+    @attrs = attrs
+  end
+
+  attr_reader :attrs
+end
 
 def torrent_dir
   ENV.fetch('TR_TORRENT_DIR')
@@ -21,18 +29,19 @@ def torrent_path
 end
 
 def size(path)
-  stdout, stderr, status = Open3.capture3("du -s \"#{path}\" | cut -f 1")
-  if status.exitstatus.zero?
-    stdout.strip.to_i
+  path = File.expand_path(path)
+  return File.size(path) if File.file?(path)
+  if File.directory?(path)
+    Dir["#{path}/**/*"].select { |f| File.file?(f) }.sum { |f| File.size(f) }
   else
-    raise stderr
+    raise ArgumentError, "#{path} is not a file or directory"
   end
 end
 
 def with_reporting
   yield
 rescue StandardError => e
-  Rollbar.error(e)
+  Rollbar.error(e, e.respond_to?(:attrs) ? e.attrs : {})
   raise e
 end
 
@@ -40,35 +49,38 @@ def upload
   size = size(torrent_path)
   started = Time.now
 
-  Rollbar.info("started upload",
-    torrent_name: torrent_name, size: size)
+  attrs = {
+    torrent_path: torrent_path, torrent_name: torrent_name,
+    size: size, size_mb: size/1000.0,
+    started: started,
+  }
 
-  stdout, stderr, status = Open3.capture3("~/dropbox_uploader.sh upload #{torrent_path} #{torrent_name}")
+  Rollbar.info("started upload", attrs)
+
+  stdout, stderr, status = Open3
+    .capture3(File.expand_path("~/dropbox_uploader.sh"), "upload", torrent_path, torrent_name)
+
+  finished = Time.now
+  seconds = finished - started
+
+  attrs.merge!(
+    stdout: stdout, stderr: stderr, status: status.exitstatus,
+    mpbs: size / seconds / 1000.0,
+    minutes: seconds / 60, finished: finished,
+  )
 
   unless status.exitstatus.zero?
-    Rollbar.error("failed to upload",
-      stdout: stdout, stderr: stderr, status: status.exitstatus, torrent_name: torrent_name)
-    raise UploadFailure, "failed to upload"
+    raise UploadFailure.new("failed to upload", attrs)
   end
 
-  seconds = Time.now - started
-  mbps = size / seconds / 1000.0
-  minutes = seconds / 60
-
-  Rollbar.info("finished upload",
-    torrent_name: torrent_name, size: size, mbps: mbps, minutes: minutes,
-    stdout: stdout, stderr: stderr)
-end
-
-def configure_rollbar
-  Rollbar.configure do |config|
-    config.access_token = ENV.fetch('ROLLBAR_ACCESS_TOKEN')
-  end
+  Rollbar.info("finished upload", attrs)
 end
 
 begin
   Dotenv.load("#{ENV.fetch('HOME')}/.env")
-  configure_rollbar
+  Rollbar.configure do |config|
+    config.access_token = ENV.fetch('ROLLBAR_ACCESS_TOKEN')
+  end
   with_reporting { upload }
 rescue StandardError => e
   LOG.error(e)
