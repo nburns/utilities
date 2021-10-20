@@ -55,6 +55,7 @@ def upload
     started: started,
   }
 
+  puts 'started'
   Rollbar.info("started upload", attrs)
 
   stdout, stderr, status = Open3
@@ -70,8 +71,10 @@ def upload
   )
 
   if status.exitstatus.zero?
+    puts 'finished'
     Rollbar.info("finished upload", attrs)
   else
+    puts 'failed'
     Rollbar.info("failed to upload", attrs)
   end
 
