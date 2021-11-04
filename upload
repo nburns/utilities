@@ -29,12 +29,11 @@ def torrent_path
 end
 
 def size(path)
-  path = File.expand_path(path)
-  return File.size(path) if File.file?(path)
-  if File.directory?(path)
-    Dir["#{path}/**/*"].select { |f| File.file?(f) }.sum { |f| File.size(f) }
+  stdout, stderr, status = Open3.capture3('du', '-s', path)
+  if status.exitstatus.zero?
+    stdout.split("\t")[0].to_i
   else
-    raise ArgumentError, "#{path} is not a file or directory"
+    0
   end
 end
 
@@ -47,7 +46,7 @@ end
 
 def upload
   size = size(torrent_path)
-  size_mb = size / (1000.0 * 1000.0)
+  size_mb = size / (1000.0)
   started = Time.now
 
   attrs = {

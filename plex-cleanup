@@ -1,0 +1,29 @@
+#!/usr/bin/env python3
+import sys
+import os
+from IPython import embed
+
+try:
+    import plexapi.myplex
+except ImportError:
+    sys.exit("pip install plexapi")
+
+username = os.environ['PLEX_USERNAME']
+password = os.environ['PLEX_PASSWORD']
+server_name = os.environ['PLEX_SERVER']
+
+print(f'starting')
+account = plexapi.myplex.MyPlexAccount(username, password)
+print(f'connected to {account}')
+
+server = account.resource(server_name).connect()
+print(f'connected to {server}')
+
+playlist = server.playlist('Played youtube')
+for item in playlist.items():
+    if item.viewCount > 0:
+        print(f'deleting {item}')
+        item.delete()
+print('done')
+
+
