@@ -29,4 +29,10 @@ for item in watched_items:
     print(f'deleting {item}')
     item.delete()
 
+print('emptying trash')
+section.emptyTrash()
+
+print('updating files')
+section.update()
+
 print('done')
