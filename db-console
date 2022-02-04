@@ -50,7 +50,8 @@ class Connection:
     @property
     def port(self):
         return self.raw_port or {
-            'postgres': 5432
+            'postgres': 5432,
+            'mysql': 3306
         }[self.engine]
 
     @property
@@ -97,6 +98,7 @@ class Connection:
 
             IMPORT FOREIGN SCHEMA "{self.foreign_schema_name}"
             EXCEPT (
+            authorized_user_list,
                 all_permissions, column_permissions, database_permissions,
                 function_permissions, permission_target, schema_permissions,
                 sequence_permissions, table_permissions, view_permissions
@@ -112,6 +114,10 @@ class Connection:
                   'host': self.host,
                   'dbname': self.database,
                   'port': self.port,
+                  'updatable': 'false',
+                  'truncatable': 'false',
+                  'async_capable': 'true',
+                  'fetch_size': 1000,
               },
               'user': {
                   'user': self.user,
