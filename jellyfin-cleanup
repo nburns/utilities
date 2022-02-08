@@ -66,6 +66,6 @@ container = client.container_to_delete_from()
 print(f'Found container: {container["Name"]}')
 
 for item in client.items_in_container(container['Id']):
-    if item['UserData']['Played']:
+    if item['UserData']['PlayCount'] > 0:
         print(f'Deleting item: {item["Name"]}')
         client.delete_item(item['Id'])
