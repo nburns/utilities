@@ -1,5 +1,18 @@
 #!/usr/bin/env ruby
 require 'json'
+require  'pry'
+
+args = ARGV
+
+if ARGV[0] == '--print'
+  output = :print
+  args.shift
+elsif args.length == 0
+  args = ['data']
+else
+  output = :json
+end
+
 
 # Expression      Result
 # {}.a            nil
@@ -22,6 +35,13 @@ end
 
 d = data = JSON.parse(STDIN.read)
 
-result = binding.eval('data' + ARGV.join(' '))
+result = binding.eval(args.join(' '))
 
-puts JSON.pretty_generate(result)
+case output
+when :print
+  puts result
+when :json
+  puts JSON.pretty_generate(result)
+else
+  raise StandardError("dont know how to handle #{output.inspect}")
+end
