@@ -1,0 +1,4 @@
+#!/usr/bin/env fish
+sudo scutil --set LocalHostName $argv[1]
+sudo scutil --set ComputerName $argv[1]
+sudo scutil --set HostName $argv[1]
