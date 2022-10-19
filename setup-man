@@ -1,0 +1,15 @@
+#!/usr/bin/env fish
+cd ~
+mkdir -p man
+help2man pytest --no-discard-stderr > ~/man/man1/pytest.1
+help2man gunicorn > ~/man/man1/gunicorn.1
+help2man dbmate > ~/man/man1/dbmate.1
+help2man autoflake > ~/man/man1/autoflake.1
+help2man csvformat > ~/man/man1/csvformat.1
+man pg_format > ~/man/man1/pg_format.1
+
+if which keto > /dev/null
+    keto completion fish > ~/.config/fish/completions/keto.fish
+end
+
+fish_update_completions
