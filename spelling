@@ -1,0 +1,5 @@
+#!/usr/bin/env fish
+set temp (mktemp)
+echo $argv > $temp
+aspell -c $temp
+cat $temp
