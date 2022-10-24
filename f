@@ -1,6 +1,6 @@
 #!/usr/bin/env fish
 
-if which batcat
+if which batcat > /dev/null
     set bat batcat
 else
     set bat bat

@@ -8,6 +8,8 @@ try:
 except ImportError:
     sys.exit("pip install plexapi")
 
+#https://python-plexapi.readthedocs.io/en/latest/introduction.html
+
 username = os.environ['PLEX_USERNAME']
 password = os.environ['PLEX_PASSWORD']
 server_name = os.environ['PLEX_SERVER']
