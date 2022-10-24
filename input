@@ -1,0 +1,2 @@
+#!/usr/bin/env fish
+osascript -e 'tell application "iTerm" to display dialog "Enter input" default answer " " with title "Input" buttons {"OK"} default button 1' | cut -d : -f 3

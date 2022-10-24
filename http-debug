@@ -40,7 +40,7 @@ def echo():
 
 
 def main():
-    app.run(debug=True, port=9292)
+    app.run(debug=True, port=9292, host='0.0.0.0')
 
 
 if __name__ == '__main__':

@@ -1,0 +1,3 @@
+#!/usr/bin/env fish
+# value is in number of megabytes
+sudo defaults write /Library/Preferences/com.apple.TimeMachine MaxSize $argv[1]
