@@ -1,0 +1,22 @@
+#!/usr/bin/env fish
+
+function rename
+    set id (echo $argv[1] | egrep -o 'tvdb-[0-9]+' | egrep -o '[0-9]+')
+
+    if [ -z $id ]
+        echo unable to detect show id from $argv
+    else
+        tvnamer -c ~/.tvnamer-config.json --recursive --series-id $id "$argv[1]"
+    end
+end
+
+cd /mnt/data/TV\ Shows
+rename 'for all mankind {tvdb-356202}'
+rename 'foundation {tvdb-366972}'
+rename 'Obi-Wan Kenobi {tvdb-393199}'
+rename 'rick and morty {tvdb-275274}'
+rename 'Star Trek Discovery {tvdb-328711}'
+rename 'Star Trek Lower Decks {tvdb-367138}'
+rename 'Star Trek Picard {tvdb-364093}'
+rename 'Star Trek Strange New Worlds {tvdb-382389}'
+rename 'Succession {tvdb-338186}'
