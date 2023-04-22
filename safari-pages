@@ -1,0 +1,74 @@
+#!/usr/local/opt/python@3.11
+import plistlib
+from os.path import expanduser
+from dataclasses import dataclass
+from enum import StrEnum
+from socket import gethostname
+from sqlite3 import connect
+import json
+
+
+@dataclass
+class Bookmark:
+    class Kind(StrEnum):
+        History = "History"
+        BookmarksBar = "BookmarksBar"
+        BookmarksMenu = "BookmarksMenu"
+        ReadingList = "com.apple.ReadingList"
+        CloudTab = 'CloudTab'
+
+    url: str
+    kind: Kind
+    host: str
+    title: str
+    image_url: str = None
+
+    def to_json(self):
+        return {
+            "url": self.url,
+            "image_url": self.image_url,
+            "kind": str(self.kind),
+            'host': self.host,
+            'title': self.title,
+        }
+
+    @classmethod
+    def from_bookmarks(cls):
+        path = expanduser("~/Library/Safari/Bookmarks.plist")
+        host = gethostname()
+        with open(path, "rb") as bookmarks_file:
+            bookmarks_data = plistlib.load(bookmarks_file)
+
+        for child in bookmarks_data["Children"]:
+            kind = Bookmark.Kind(child["Title"])
+
+            for bookmark in child.get("Children", []):
+                print(bookmark.__class__)
+                print(bookmark.keys())
+                if "URLString" in bookmark:
+                    yield cls(
+                        kind=kind,
+                        url=bookmark["URLString"],
+                        image_url=bookmark.get("imageURL", None),
+                        host=host
+                    )
+
+    @classmethod
+    def from_cloud_tabs(cls):
+        path = expanduser("~/Library/Safari/cloudtabs.db")
+        connection = connect(path)
+        cursor = connection.cursor()
+        result = cursor.execute("""
+            select url, title, device_name, position
+            from cloud_tabs join cloud_tab_devices
+                on cloud_tabs.device_uuid = cloud_tab_devices.device_uuid
+            order by
+                device_name, position desc;
+
+        """)
+        for (url, title, device_name, position) in result:
+            yield Bookmark(kind=Bookmark.Kind.CloudTab, url=url, title=title, host=device_name)
+
+
+
+print(json.dumps(list(Bookmark.from_cloud_tabs()), default=lambda o: o.to_json()))

@@ -1,0 +1,26 @@
+#!/usr/bin/env python
+import bpy
+import argparse
+from pathlib import Path
+import tempfile
+import shutil
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-i", "--infile", type=Path, default="/dev/stdin")
+    parser.add_argument("-o", "--outfile", type=Path, default="/dev/stdout")
+    args = parser.parse_args()
+
+    bpy.ops.wm.read_factory_settings(use_empty=True)
+
+    bpy.ops.import_mesh.stl(filepath=str(args.infile))
+
+    # appends its own extension :( so we copy the result
+    temp = tempfile.NamedTemporaryFile(suffix=".glb")
+    bpy.ops.export_scene.gltf(filepath=temp.name)
+    shutil.copy(temp.name, args.outfile)
+
+
+if __name__ == "__main__":
+    main()
