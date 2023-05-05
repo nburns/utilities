@@ -8,11 +8,7 @@ end
 
 set preview $bat' --color=always --theme=GitHub --style=numbers --line-range=:100 {}'
 
-if [ -n "$argv" ]
-    set file (fzf -i -q --preview $preview $argv)
-else
-    set file (fzf -i --preview $preview )
-end
+set file (fzf -i --preview $preview)
 
 if [ -n "$file" ]
     echo $file
