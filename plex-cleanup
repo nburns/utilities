@@ -28,8 +28,9 @@ if not watched_items:
     print('nothing to delete')
 
 for item in watched_items:
-    print(f'deleting {item}')
-    item.delete()
+    if not item.lastRatedAt:
+        print(f'deleting {item}')
+        item.delete()
 
 print('emptying trash')
 section.emptyTrash()
