@@ -10,13 +10,4 @@ function rename
     end
 end
 
-cd /mnt/data/TV\ Shows
-rename 'for all mankind {tvdb-356202}'
-rename 'foundation {tvdb-366972}'
-rename 'Obi-Wan Kenobi {tvdb-393199}'
-rename 'rick and morty {tvdb-275274}'
-rename 'Star Trek Discovery {tvdb-328711}'
-rename 'Star Trek Lower Decks {tvdb-367138}'
-rename 'Star Trek Picard {tvdb-364093}'
-rename 'Star Trek Strange New Worlds {tvdb-382389}'
-rename 'Succession {tvdb-338186}'
+rename $argv
