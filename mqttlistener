@@ -1,0 +1,27 @@
+#!/usr/bin/env python3
+import paho.mqtt.client
+import sys
+from datetime import timedelta
+
+def on_connect(client, data, flags, rc):
+    print(f"connected {rc}", file=sys.stderr)
+
+def on_message(client, data, message):
+    print(f"{message.topic} {message.payload}")
+
+
+def main():
+    client = paho.mqtt.client.Client()
+    client.on_connect = on_connect
+    client.on_message = on_message
+
+    client.connect("nas.local", 1883, keepalive=65535)
+    client.subscribe("esp32/#")
+    client.loop_forever()
+
+if __name__ == '__main__':
+    try:
+        main()
+    except KeyboardInterrupt as e:
+        sys.exit()
+

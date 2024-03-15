@@ -1,0 +1,5 @@
+#!/usr/bin/env fish
+set url (read)
+set name (read)
+echo $url $name
+yt-dlp $url -o $name".%(ext)s"

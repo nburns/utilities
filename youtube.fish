@@ -2,7 +2,7 @@
 set fish_trace 1 2
 
 set LOCKFILE ~/.youtube.lock
-set COMMAND "cd /mnt/media/youtube;\
+set COMMAND "cd /mnt/data/youtube;\
 /home/nick/.local/bin/yt-dlp\
     --add-metadata\
     --embed-thumbnail\
@@ -11,7 +11,9 @@ set COMMAND "cd /mnt/media/youtube;\
     --cookies ./cookies.txt\
     -f 'bestvideo[vcodec!*=av01][height<=?1080]+bestaudio[acodec!*=opus]'\
     --merge-output-format mkv\
-    'https://www.youtube.com/playlist?list=WL' -o '%(uploader)s-%(title)s.%(ext)s';"
+    'https://www.youtube.com/playlist?list=WL' -o '%(uploader)s-%(title)s.%(ext)s';\
+/home/nick/.local/bin/yt-dlp --print-json --flat-playlist --cookies cookies.txt\
+    'https://www.youtube.com/playlist?list=WL' | ./add-video.py"
 
 function log
     echo (date):$argv | tee -a ~/Desktop/youtube.log

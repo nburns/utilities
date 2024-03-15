@@ -1,0 +1,13 @@
+#!/usr/bin/env fish
+
+function rename
+    set id (echo $argv[1] | egrep -o 'tvdb-[0-9]+' | egrep -o '[0-9]+')
+
+    if [ -z $id ]
+        echo unable to detect show id from $argv
+    else
+        tvnamer -c ~/.tvnamer-config.json --recursive --series-id $id "$argv[1]"
+    end
+end
+
+rename $argv

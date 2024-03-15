@@ -70,7 +70,7 @@ def cat(path, print_file_path = False):
             else:
                 for line in f:
                     sys.stdout.write(line)
-    except FileNotFoundError:
+    except (FileNotFoundError, BrokenPipeError):
         return
 
 
@@ -105,3 +105,5 @@ if __name__ == '__main__':
         devnull = os.open(os.devnull, os.O_WRONLY)
         os.dup2(devnull, sys.stdout.fileno())
         sys.exit()
+    except KeyboardInterrupt:
+        pass

@@ -1,0 +1,2 @@
+#!/usr/bin/env bash
+mandoc -T pdf "$(/usr/bin/man -w $@)" | open -fa Preview

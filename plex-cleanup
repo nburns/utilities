@@ -8,6 +8,8 @@ try:
 except ImportError:
     sys.exit("pip install plexapi")
 
+#https://python-plexapi.readthedocs.io/en/latest/introduction.html
+
 username = os.environ['PLEX_USERNAME']
 password = os.environ['PLEX_PASSWORD']
 server_name = os.environ['PLEX_SERVER']
@@ -26,8 +28,9 @@ if not watched_items:
     print('nothing to delete')
 
 for item in watched_items:
-    print(f'deleting {item}')
-    item.delete()
+    if not item.lastRatedAt:
+        print(f'deleting {item}')
+        item.delete()
 
 print('emptying trash')
 section.emptyTrash()
