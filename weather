@@ -8,8 +8,8 @@ try:
 except ImportError:
     papirus = None
 
-latitude = '45.489938'
-longitude = '-122.690453'
+latitude = '45.551413'
+longitude = '-122.589005'
 
 session = requests.Session()
 session.headers.update({'User-Agent': 'nicks-weather-script'})

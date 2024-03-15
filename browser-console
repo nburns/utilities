@@ -1,0 +1,32 @@
+#!/usr/bin/env python
+from playwright.sync_api import sync_playwright
+import argparse
+import json
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--url", required=True, help="the url to go to")
+    parser.add_argument("--js", help="js to evaluate and print")
+    parser.add_argument("--ui", default=False, action="store_true", help="render ui")
+    args = parser.parse_args()
+
+    playwright = sync_playwright().start()
+    try:
+        browser = playwright.webkit.launch(headless=not args.ui)
+        context = browser.new_context()
+        page = context.new_page()
+
+        page.goto(args.url)
+
+        if args.js:
+            print(json.dumps(page.evaluate(args.js)))
+
+        else:
+            breakpoint()
+
+    finally:
+        browser.close()
+        playwright.stop()
+
+if __name__ == '__main__':
+    main()
