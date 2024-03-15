@@ -3,5 +3,5 @@ git for-each-ref \
     --sort=committerdate refs/heads/ \
     --color=always \
     --format='%(HEAD) %(color:green)%(refname:short);%(color:magenta)%(objectname:short);%(color:reset)%(contents:subject)' |
-tail -n 10 |
+tail -n 20 |
 column -t -s \;

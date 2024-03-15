@@ -1,0 +1,38 @@
+#!/usr/bin/env swift
+import Vision
+import Darwin
+
+var handler: VNImageRequestHandler
+
+if (CommandLine.arguments.count == 2) {
+    let path = CommandLine.arguments[1]
+    let url = URL(fileURLWithPath: path)
+    handler = VNImageRequestHandler(url: url, options: [:])
+} else {
+    let file = FileHandle.standardInput
+    let data = file.availableData
+    handler = VNImageRequestHandler(data: data, options: [:])
+}
+
+
+let request = VNRecognizeTextRequest { (request, error) in
+  if error != nil {
+    fputs("\(String(describing:error))\n", stderr)
+    exit(1)
+  }
+  guard let obs = request.results as? [VNRecognizedTextObservation]
+  else {
+    fputs("no results\n", stderr)
+    exit(1)
+  }
+
+  for observation in obs {
+    let top: [VNRecognizedText] = observation.topCandidates(1)
+
+    if let recognizedText: VNRecognizedText = top.first {
+      print(recognizedText.string)
+    }
+  }
+}
+request.recognitionLevel = VNRequestTextRecognitionLevel.accurate
+try? handler.perform([request])

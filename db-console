@@ -6,31 +6,73 @@ from inspect import cleandoc
 import argparse
 import os
 import re
+import json
+import sys
+import subprocess
 
+def manager_databases():
+    out = subprocess.check_output('op item list --categories Database --format json'.split(' '))
+    return json.loads(out.decode())
+
+def op_item(id):
+    out = subprocess.check_output('op item get --format json'.split(' ') + [id])
+    return json.loads(out.decode())
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('url', default=None, help="A database connection url")
+    parser.add_argument('url', nargs="?", default=None, help="A database connection url")
     parser.add_argument('--fdw', default=False, action='store_true', help="generate psql fdw commands for the url")
     parser.add_argument('--connect', default=True, action='store_true', help="open an interactive session to the db")
+    parser.add_argument('--ping', default=False, action='store_true', help="establish a connection then close it")
+    parser.add_argument('--ping-command', default="select count(*) from information_schema.tables")
+    parser.add_argument('--connect-timeout', default="2", type=int)
+    parser.add_argument('--read-timeout', default="2", type=int)
+    parser.add_argument('--one-pw', help="connect to a database from 1 password by item name", choices=[d['title'] for d in manager_databases()])
+
+    parser.add_argument('--json', default=False, action='store_true', help="output parameters as json")
 
     args = parser.parse_args()
 
-    url = urlparse(args.url)
-    netloc = parse_netloc(url.netloc)
+    if args.one_pw:
+        id = next(d for d in manager_databases() if d['title'] == args.one_pw)['id']
+        item = op_item(id)
+        fields = {f['label']: f.get('value') for f in item['fields']}
+        connection = Connection(
+            host=fields['server'],
+            raw_port=fields['port'],
+            database=fields['database'],
+            raw_engine=fields['type'],
+            user=fields['username'],
+            password=fields['password'],
+        )
 
-    connection = Connection(
-        host=url.hostname,
-        raw_port=url.port,
-        database=url.path.lstrip('/'),
-        raw_engine=url.scheme,
-        user=netloc.user,
-        password=netloc.password,
-        url=args.url,
-    )
+
+    else:
+        url = urlparse(args.url)
+        netloc = parse_netloc(url.netloc)
+
+        connection = Connection(
+            host=url.hostname,
+            raw_port=url.port,
+            database=url.path.lstrip('/'),
+            raw_engine=url.scheme,
+            user=netloc.user,
+            password=netloc.password,
+            url=args.url,
+        )
+
     if args.fdw:
         print(connection.generate_fdw())
         return
+
+    if args.json:
+        print(json.dumps(connection.to_dict))
+        return
+
+    if args.ping:
+        connection.ping(args.ping_command, args.connect_timeout, args.read_timeout)
+        return
+
 
     if args.connect:
         connection.connect() # process replacement
@@ -61,6 +103,30 @@ class Connection:
 
         if "mysql" in self.raw_engine:
             return 'mysql'
+
+    def ping(self, command, connect_timeout, read_timeout):
+        if self.engine == 'mysql':
+            try:
+                import MySQLdb
+            except ImportError as e:
+                raise RuntimeError("pip install mysql") from e
+
+            kwargs = dict(host=self.host, user=self.user, db=self.database)
+            if self.password:
+                kwargs['passwd'] = self.password
+            try:
+                connection = MySQLdb.connect(**kwargs, connect_timeout=connect_timeout, read_timeout=read_timeout)
+                cursor = connection.cursor()
+                cursor.execute(command)
+                list(cursor.fetchall())
+                connection.close()
+                print('connected')
+            except MySQLdb.OperationalError:
+                print('not connected')
+                sys.exit(1)
+
+        if self.engine == 'postgres':
+            raise NotImplemented("not yet")
 
     @property
     def wrapper(self):
@@ -159,6 +225,17 @@ class Connection:
 
         os.execvp(self.engine, args)
 
+    @property
+    def to_dict(self):
+        return {
+            'engine': self.engine,
+            'user': self.user,
+            'password': self.password,
+            'host': self.host,
+            'port': self.port,
+            'database': self.database,
+        }
+
 
 def parse_netloc(netloc_str):
     @dataclass
@@ -166,25 +243,25 @@ def parse_netloc(netloc_str):
         user: str = None
         password: str = None
 
-
     results = re.search(
-        r'^(?P<user>[a-zA-Z0-9_-]+):(?P<password>[a-zA-Z0-9_\-%&]+)@\S+$',
+            r'^(?P<user>[^:]+):(?P<password>[^@]+)?@\S+$',
         netloc_str)
+
+    password = results.group("password")
 
     return Netloc(
         user=results.group('user'),
-        password=unquote(results.group('password')))
+        password=unquote(password) if password else None)
 
 
 def mysql(connection):
     return [
         'mysql',
-        '--no-auto-rehash',
         '--host', connection.host,
         '--user', connection.user,
         '--port', str(connection.port or 3306),
         '--database', connection.database,
-        f"-p{connection.password}",
+        f"-p{connection.password}" if connection.password else '',
     ]
 
 

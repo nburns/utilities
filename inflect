@@ -5,36 +5,34 @@ import argparse
 try:
     import inflection
 except ImportError:
-    sys.exit('pip install inflection')
+    sys.exit("pip install inflection")
 
-def get_formatting_scheme():
-    schemes = {
-        '-c': inflection.camelize,
-        '--camel': inflection.camelize,
+INFLECTIONS = [
+    "camelize",
+    "dasherize",
+    "humanize",
+    "ordinal",
+    "ordinalize",
+    "parameterize",
+    "pluralize",
+    "singularize",
+    "tableize",
+    "titleize",
+    "underscore",
+]
 
-        '-s': inflection.underscore,
-        '--snake': inflection.underscore,
-    }
 
-    for scheme in schemes.keys():
-        if scheme in sys.argv:
-            sys.argv.pop(sys.argv.index(scheme))
-            return schemes[scheme]
+def get_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("inflection", nargs=1, choices=INFLECTIONS)
+    return parser.parse_args()
 
-    sys.exit(
-        'unknown formatting scheme, choose from ' + ', '.join(sorted(schemes.keys()))
-    )
-
-def get_string():
-    if len(sys.argv) > 1:
-        return ' '.join(sys.argv[1:])
-    else:
-        return sys.stdin.read()
 
 def main():
-    scheme = get_formatting_scheme()
+    args = get_args()
+    fn = getattr(inflection, args.inflection[0])
+    print(fn(sys.stdin.read()))
 
-    print(scheme(get_string()))
 
 if __name__ == "__main__":
     main()

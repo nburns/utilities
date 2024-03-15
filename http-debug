@@ -24,19 +24,13 @@ def headers(**kwargs):
     return jsonify(headers)
 
 
-@app.endpoint("echo")
-def echo():
-    embed()
-    def all_values(k):
-        values = request.args.getlist(k)
-        return values[0] if len(values) == 1 else values
+@app.route("/", defaults={"path": ""})
+@app.route('/<path:path>')
+def echo(path):
+    headers = dict(request.headers)
+    print(headers)
+    return jsonify(headers)
 
-    if request.args.get('body'):
-        body = request.args.get('body')
-    else:
-        body = jsonify({k: all_values(k) for k in request.values.keys()})
-
-    return (body, request.args.get('error') or 200)
 
 
 def main():

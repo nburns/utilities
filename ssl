@@ -1,0 +1,45 @@
+#!/usr/bin/env python
+import socket
+import ssl
+import argparse
+import logging
+
+def main():
+    logging.captureWarnings(True)
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--host', required=True, help="the host to connect to")
+    parser.add_argument('--port', default='443', help="the port to connect on", type=int)
+    args = parser.parse_args()
+
+    if ":" in args.host:
+        connect_tuple = (args.host, args.port, 0, 0)
+        family = socket.AF_INET6
+        display = f"[{args.host}]:{args.port}"
+    else:
+        connect_tuple = (args.host, args.port)
+        family = socket.AF_INET
+        display = f"{args.host}:{args.port}"
+
+
+    for version in ssl.TLSVersion.__members__.keys():
+        if version in ['MINIMUM_SUPPORTED', 'MAXIMUM_SUPPORTED']:
+            continue
+
+        context = ssl.SSLContext()
+        context.check_hostname = False
+        context.minimum_version = ssl.TLSVersion.__members__[version]
+        context.maximum_version = ssl.TLSVersion.__members__[version]
+
+        with socket.socket(family, socket.SOCK_STREAM) as sock:
+            sock.settimeout(1)
+            with context.wrap_socket(sock) as s:
+
+                try:
+                    s.connect(connect_tuple)
+                    print(f'{display} connected {version}')
+                except (ssl.SSLError, OSError) as e:
+                    print(f'{display} error {version}: {str(e)}')
+
+if __name__ == '__main__':
+    main()

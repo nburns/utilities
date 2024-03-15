@@ -1,0 +1,24 @@
+#!/usr/bin/env python
+import sys
+import re
+import json
+
+
+if sys.argv[0]
+
+for line in sys.stdin.readlines():
+    breakpoint()
+    cookie_header_value = line.removeprefix("Cookie: ")
+    cookies = [c.strip() for c in cookie_header_value.split(';')]
+    data = {}
+    for cookie in cookies:
+        try:
+            name, value = cookie.split("=")
+            data[name] = value
+        except Exception as e:
+            print("broke on", cookie, file=sys.stderr)
+    json.dump(data, sys.stdout)
+
+
+
+

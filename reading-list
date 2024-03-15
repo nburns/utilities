@@ -1,0 +1,13 @@
+#!/usr/bin/env python
+import plistlib
+from os.path import expanduser
+
+with open(expanduser('~/Library/Safari/Bookmarks.plist'), 'rb') as bookmarks_file:
+    bookmarks_plist = plistlib.load(bookmarks_file)
+
+root = bookmarks_plist['Children']
+
+reading_list = next((c for c in root if c['Title'] == 'com.apple.ReadingList'), None)
+
+for item in reversed(reading_list['Children']):
+    print(item['URLString'])
