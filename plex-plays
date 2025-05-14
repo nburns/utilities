@@ -1,0 +1,27 @@
+#!/usr/bin/env python
+import sys
+import os
+from IPython import embed
+try:
+    import plexapi.myplex
+except ImportError:
+    sys.exit("pip install plexapi")
+
+#https://python-plexapi.readthedocs.io/en/latest/introduction.html
+
+username = os.environ['PLEX_USERNAME']
+password = os.environ['PLEX_PASSWORD']
+server_name = os.environ['PLEX_SERVER']
+
+print(f'authenticating {username}', file=sys.stderr)
+account = plexapi.myplex.MyPlexAccount(username, password)
+
+print(f'connecting to {server_name}', file=sys.stderr)
+server = account.resource(server_name).connect()
+
+print(f'searching {server}', file=sys.stderr)
+section = next(s for s in server.library.sections() if s.title == 'Movies')
+watched_items = sorted(section.search(unwatched=False), key=lambda i: i.lastViewedAt)
+
+for item in watched_items:
+    print(f"{item.title} ({item.year}),".ljust(50), item.lastViewedAt.date().isoformat())

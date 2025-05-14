@@ -1,0 +1,58 @@
+#!/usr/bin/env python3
+import paho.mqtt.client
+import sys
+from datetime import datetime
+import argparse
+import psycopg2
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--host", default="localhost", help="hostname or ip of broker")
+    parser.add_argument("--port", default=1883, type=int, help="brokers listening port")
+    parser.add_argument("-s", "--subscription", nargs="*")
+    parser.add_argument("--database-url", help="database to store messages in")
+    args = parser.parse_args()
+    subscriptions = args.subscription or ["$SYS/#"]
+
+    conn = psycopg2.connect(args.database_url) if args.database_url else None
+
+    def on_connect(client, data, flags, rc):
+        print(f"connected {rc}", file=sys.stderr)
+
+    def on_message(client, data, message):
+        print(
+            f"{datetime.now().isoformat()} {message.topic} {message.payload.decode()}"
+        )
+        if not conn:
+            return
+        cur = conn.cursor()
+        cur.execute(
+            "insert into topics (topic) values (%s) on conflict (topic) do update set topic = excluded.topic returning id",
+            (message.topic,),
+        )
+        id = cur.fetchone()[0]
+        cur.execute(
+            "INSERT INTO messages (topic_id, payload, created_at) VALUES (%s, %s, %s)",
+            (id, message.payload.decode(), datetime.now()),
+        )
+        conn.commit()
+
+    client = paho.mqtt.client.Client()
+    client.on_connect = on_connect
+    client.on_message = on_message
+
+    client.connect(args.host, args.port, keepalive=65535)
+
+    for s in subscriptions:
+        client.subscribe(s)
+
+    client.loop_forever()
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except KeyboardInterrupt:
+        sys.exit()
+#

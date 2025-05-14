@@ -6,27 +6,49 @@ import json
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--url", required=True, help="the url to go to")
-    parser.add_argument("--js", help="js to evaluate and print")
+    parser.add_argument("--js", help="js file to evaluate and print")
     parser.add_argument("--ui", default=False, action="store_true", help="render ui")
+    parser.add_argument("--debug", default=False, action="store_true", help="wait after execution")
+    parser.add_argument('--cookies', help="path to read and write cookies file")
     args = parser.parse_args()
+
+    if args.cookies:
+        with open(args.cookies, 'r+') as cookies_file:
+            cookies_data = cookies_file.read()
+            cookies = json.loads(cookies_data) if cookies_data else []
+    else:
+        cookies = []
+
 
     playwright = sync_playwright().start()
     try:
         browser = playwright.webkit.launch(headless=not args.ui)
         context = browser.new_context()
+        context.add_cookies(cookies)
         page = context.new_page()
 
-        page.goto(args.url)
+        page.goto(args.url, wait_until='domcontentloaded')
 
         if args.js:
-            print(json.dumps(page.evaluate(args.js)))
+            with open(args.js) as js_file:
+                js = js_file.read()
+            result = page.evaluate(js)
+            print(json.dumps(result))
 
-        else:
+        if args.debug:
             breakpoint()
+            1/1
+
+        cookies = context.cookies()
 
     finally:
         browser.close()
         playwright.stop()
+
+    if args.cookies:
+        with open(args.cookies, 'w+') as cookies_file:
+            json.dump(cookies, cookies_file, indent=4)
+
 
 if __name__ == '__main__':
     main()

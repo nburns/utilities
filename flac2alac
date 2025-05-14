@@ -1,0 +1,54 @@
+#!/usr/bin/env python3
+import argparse
+import os
+import re
+import subprocess
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--artist', required=True)
+    parser.add_argument('--album', required=True)
+    parser.add_argument('--cover', required=True)
+    parser.add_argument('--year', required=True)
+    parser.add_argument('--genre', required=True)
+    parser.add_argument('--location', default=os.getcwd())
+    parser.add_argument('--dry-run', default=False, action='store_true')
+    args = parser.parse_args()
+    args.files = sorted(f for f in os.listdir(args.location) if f.lower().endswith('flac'))
+
+    digits = '\d+[ -.]+'
+
+    argvs = []
+    total = len(args.files)
+    argvs.append(['mkdir', '-p', args.album])
+    for idx, file in enumerate(args.files, start=1):
+        out = re.sub(digits, f'{str(idx).zfill(2)} ', re.sub('flac$', 'm4a', file, flags=re.I))
+        assert str(idx) in out
+
+        track = re.sub('\d+[ -.]+', '', re.sub('.m4a', '', os.path.basename(out)))
+        argvs.append([ "ffmpeg", '-vn', '-y', "-i", file, "-acodec", "alac", out ])
+
+        argvs.append([
+            'AtomicParsley', out,
+            '--artwork', args.cover,
+            '--artist', args.artist,
+            '--album', args.album,
+            '--title', track,
+            '--tracknum', f'{idx}/{total}',
+            '--year', args.year,
+            '--genre', args.genre,
+            '--overWrite'
+        ])
+
+        argvs.append(['mv', out, args.album])
+
+    for argv in argvs:
+        if args.dry_run:
+            print(' '.join(argv))
+        else:
+            subprocess.check_output(
+                argv, env=(os.environ | {'PIC_OPTIONS': 'removeTempPix'}))
+
+
+if __name__ == '__main__':
+    main()

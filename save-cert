@@ -3,7 +3,7 @@ set HOSTNAME $argv[1]
 set PORT $argv[2]
 set NAME $argv[3]
 
-echo -n | /usr/local/opt/openssl@3/bin/openssl s_client\
+echo -n | openssl s_client\
     -connect $HOSTNAME:$PORT\
     -servername $NAME |\
-    /usr/local/opt/openssl@3/bin/openssl x509 > $NAME
+    openssl x509 > $NAME

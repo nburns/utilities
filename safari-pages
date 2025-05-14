@@ -1,4 +1,4 @@
-#!/usr/local/opt/python@3.11
+#!/usr/bin/env python
 import plistlib
 from os.path import expanduser
 from dataclasses import dataclass
@@ -39,6 +39,8 @@ class Bookmark:
         with open(path, "rb") as bookmarks_file:
             bookmarks_data = plistlib.load(bookmarks_file)
 
+        breakpoint()
+
         for child in bookmarks_data["Children"]:
             kind = Bookmark.Kind(child["Title"])
 
@@ -71,4 +73,6 @@ class Bookmark:
 
 
 
-print(json.dumps(list(Bookmark.from_cloud_tabs()), default=lambda o: o.to_json()))
+[print(json.dumps(b, default=lambda o: o.to_json())) for b in Bookmark.from_cloud_tabs()]
+
+
