@@ -9,6 +9,7 @@ import re
 import json
 import sys
 import subprocess
+from urllib.parse import quote_plus
 
 def manager_databases():
     out = subprocess.check_output('op item list --categories Database --format json'.split(' '))
@@ -23,11 +24,14 @@ def main():
     parser.add_argument('url', nargs="?", default=None, help="A database connection url")
     parser.add_argument('--fdw', default=False, action='store_true', help="generate psql fdw commands for the url")
     parser.add_argument('--connect', default=True, action='store_true', help="open an interactive session to the db")
+    parser.add_argument('--print-url', default=False, action='store_true', help="print the url then exit")
     parser.add_argument('--ping', default=False, action='store_true', help="establish a connection then close it")
     parser.add_argument('--ping-command', default="select count(*) from information_schema.tables")
     parser.add_argument('--connect-timeout', default="2", type=int)
     parser.add_argument('--read-timeout', default="2", type=int)
     parser.add_argument('--one-pw', help="connect to a database from 1 password by item name", choices=[d['title'] for d in manager_databases()])
+    parser.add_argument('--schema-introspection', default=False, action="store_true", help="enable auto complete")
+    parser.add_argument("--host", default=None, help="override the host value from other sources")
 
     parser.add_argument('--json', default=False, action='store_true', help="output parameters as json")
 
@@ -44,6 +48,7 @@ def main():
             raw_engine=fields['type'],
             user=fields['username'],
             password=fields['password'],
+            schema_introspection=args.schema_introspection,
         )
 
 
@@ -58,8 +63,11 @@ def main():
             raw_engine=url.scheme,
             user=netloc.user,
             password=netloc.password,
-            url=args.url,
+            schema_introspection=args.schema_introspection,
         )
+
+    if args.host:
+        connection.host = args.host
 
     if args.fdw:
         print(connection.generate_fdw())
@@ -73,6 +81,9 @@ def main():
         connection.ping(args.ping_command, args.connect_timeout, args.read_timeout)
         return
 
+    if args.print_url:
+        print(connection.url)
+        return
 
     if args.connect:
         connection.connect() # process replacement
@@ -81,13 +92,22 @@ def main():
 
 @dataclass
 class Connection:
+    schema_introspection: bool
     user: str = None
     host: str = None
     raw_port: int = None
     password: str = None
     database: str = None
     raw_engine: str = None
-    url: str = None
+
+    @property
+    def url(self):
+        if self.user:
+            netloc = f"{quote_plus(self.user)}:{quote_plus(self.password)}@{self.host}:{self.port}"
+        else:
+            netloc = f"{self.host}:{self.port}"
+
+        return f"{self.engine}://{netloc}/{quote_plus(self.schema_name)}"
 
     @property
     def port(self):
@@ -255,14 +275,15 @@ def parse_netloc(netloc_str):
 
 
 def mysql(connection):
-    return [
+    return [e for e in [
         'mysql',
         '--host', connection.host,
         '--user', connection.user,
         '--port', str(connection.port or 3306),
         '--database', connection.database,
-        f"-p{connection.password}" if connection.password else '',
-    ]
+        f"-p{connection.password}" if connection.password else None,
+        '-A' if not connection.schema_introspection else None
+    ] if e is not None ]
 
 
 def postgres(connection):
