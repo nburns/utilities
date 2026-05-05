@@ -1,0 +1,179 @@
+#!/usr/bin/env python3
+
+import argparse
+import hashlib
+import os
+import pathlib
+import shutil
+import subprocess
+import sys
+
+import requests
+
+CACHE_ROOT = pathlib.Path("/tmp/get-ci-errors")
+SCRIPT_SHA_FILE = CACHE_ROOT / "script.sha"
+
+
+CIRCLECI_BASE = "https://circleci.com/api/v2"
+GITHUB_BASE = "https://api.github.com"
+
+
+def git(*args):
+    result = subprocess.run(["git"] + list(args), capture_output=True, text=True, check=True)
+    return result.stdout.strip()
+
+
+def current_branch():
+    return git("rev-parse", "--abbrev-ref", "HEAD")
+
+
+def github_repo():
+    url = git("remote", "get-url", "origin")
+    if url.startswith("git@"):
+        path = url.split(":", 1)[1]
+    else:
+        path = url.split("github.com/", 1)[1]
+    return path.removesuffix(".git")
+
+
+def github_token():
+    token = os.environ.get("GITHUB_TOKEN")
+    if not token:
+        result = subprocess.run(["gh", "auth", "token"], capture_output=True, text=True)
+        if result.returncode == 0:
+            token = result.stdout.strip()
+    return token
+
+
+def gh_get(path, token, **params):
+    resp = requests.get(
+        f"{GITHUB_BASE}{path}",
+        headers={"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json"},
+        params=params or None,
+    )
+    resp.raise_for_status()
+    return resp.json()
+
+
+def circle_get(path, token, **params):
+    resp = requests.get(
+        f"{CIRCLECI_BASE}{path}",
+        headers={"Circle-Token": token},
+        params=params or None,
+    )
+    resp.raise_for_status()
+    return resp.json()
+
+
+def find_pr(repo, branch, token):
+    owner = repo.split("/")[0]
+    prs = gh_get(f"/repos/{repo}/pulls", token, head=f"{owner}:{branch}", state="open")
+    if not prs:
+        prs = gh_get(f"/repos/{repo}/pulls", token, head=f"{owner}:{branch}", state="closed")
+    if not prs:
+        sys.exit(f"No PR found for branch '{branch}'")
+    return prs[0]
+
+
+def find_pipeline(project_slug, branch, token):
+    items = circle_get(f"/project/{project_slug}/pipeline", token, branch=branch).get("items", [])
+    if not items:
+        sys.exit(f"No CircleCI pipeline found for branch '{branch}'")
+    return items[0]
+
+
+def collect_failures(project_slug, pipeline_id, circle_token):
+    workflows = circle_get(f"/pipeline/{pipeline_id}/workflow", circle_token).get("items", [])
+    failures = []
+    for workflow in workflows:
+        jobs = circle_get(f"/workflow/{workflow['id']}/job", circle_token).get("items", [])
+        for job in jobs:
+            job_number = job.get("job_number")
+            if not job_number or job.get("status") not in ("failed", "success"):
+                continue
+            try:
+                tests = circle_get(f"/project/{project_slug}/{job_number}/tests", circle_token).get("items", [])
+            except requests.HTTPError:
+                continue
+            for test in tests:
+                if test.get("result") == "failure":
+                    failures.append((job["name"], test))
+    return failures
+
+
+def cache_path(repo, branch, sha):
+    return CACHE_ROOT / repo / branch / sha / "failures"
+
+
+def script_changed():
+    current = hashlib.sha256(pathlib.Path(__file__).read_bytes()).hexdigest()
+    if not SCRIPT_SHA_FILE.exists() or SCRIPT_SHA_FILE.read_text().strip() != current:
+        return True, current
+    return False, current
+
+
+def main():
+    changed, current_sha = script_changed()
+
+    parser = argparse.ArgumentParser(description="Print Python unittest failures from CircleCI for the current branch's PR")
+    parser.add_argument("--branch", help="Branch name (default: current git branch)")
+    parser.add_argument("--circle-token", default=os.environ.get("CIRCLE_TOKEN"), help="CircleCI API token (or set CIRCLE_TOKEN)")
+    parser.add_argument("--github-token", help="GitHub API token (or set GITHUB_TOKEN, or relies on gh CLI)")
+    parser.add_argument("--clear-cache", action="store_true", default=changed, help="Clear all cached results (default: true when script has changed)")
+    args = parser.parse_args()
+
+    if not args.circle_token:
+        sys.exit("CircleCI token required: set CIRCLE_TOKEN or pass --circle-token")
+
+    branch = args.branch or current_branch()
+    sha = git("rev-parse", "HEAD")
+    token = args.github_token or github_token()
+    repo = github_repo()
+    project_slug = f"gh/{repo}"
+
+    if args.clear_cache and CACHE_ROOT.exists():
+        shutil.rmtree(CACHE_ROOT)
+        print("Cache cleared.", file=sys.stderr)
+
+    CACHE_ROOT.mkdir(parents=True, exist_ok=True)
+    SCRIPT_SHA_FILE.write_text(current_sha)
+
+    cached = cache_path(repo, branch, sha)
+    if cached.exists():
+        print("(cached)", file=sys.stderr)
+        content = cached.read_text()
+        if content:
+            sys.stdout.write(content)
+        else:
+            print("No test failures found.", file=sys.stderr)
+        return
+
+    pr = find_pr(repo, branch, token)
+    print(f"PR #{pr['number']}: {pr['title']}", file=sys.stderr)
+
+    pipeline = find_pipeline(project_slug, branch, args.circle_token)
+    print(f"Pipeline #{pipeline['number']} ({pipeline['id']})", file=sys.stderr)
+
+    failures = collect_failures(project_slug, pipeline["id"], args.circle_token)
+
+    lines = []
+    for job_name, test in failures:
+        file_ = test.get("file", "")
+        classname = test.get("classname", "")
+        name = test.get("name", "")
+        location = file_ or classname
+        lines.append(f"{location}::{name}")
+
+    cached.parent.mkdir(parents=True, exist_ok=True)
+    cached.write_text("\n".join(lines) + "\n" if lines else "")
+
+    if not lines:
+        print("No test failures found.", file=sys.stderr)
+        return
+
+    for line in lines:
+        print(line)
+
+
+if __name__ == "__main__":
+    main()
