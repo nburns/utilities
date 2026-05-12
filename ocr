@@ -1,38 +1,146 @@
 #!/usr/bin/env swift
-import Vision
+import AppKit
+import VisionKit
 import Darwin
 
-var handler: VNImageRequestHandler
+let imageExts: Set<String> = ["png", "jpg", "jpeg", "tiff", "tif", "bmp", "gif", "heic", "webp"]
 
-if (CommandLine.arguments.count == 2) {
-    let path = CommandLine.arguments[1]
-    let url = URL(fileURLWithPath: path)
-    handler = VNImageRequestHandler(url: url, options: [:])
-} else {
-    let file = FileHandle.standardInput
-    let data = file.availableData
-    handler = VNImageRequestHandler(data: data, options: [:])
+func usage(exitCode: Int32 = 1) -> Never {
+    let out = exitCode == 0 ? stdout : stderr
+    fputs("Usage: ocr [FILE | CLIPBOARD | LASTSCREENSHOT]\n", out)
+    fputs("  FILE            path to an image file\n", out)
+    fputs("  CLIPBOARD       read image from clipboard\n", out)
+    fputs("  LASTSCREENSHOT  use most recent screenshot\n", out)
+    fputs("\nDefault (no args): clipboard if it contains an image, otherwise LASTSCREENSHOT.\n", out)
+    fputs("\nOptions:\n", out)
+    fputs("  -h, --help  show this help\n", out)
+    exit(exitCode)
 }
 
+enum ImageSource { case url(URL); case nsImage(NSImage) }
 
-let request = VNRecognizeTextRequest { (request, error) in
-  if error != nil {
-    fputs("\(String(describing:error))\n", stderr)
-    exit(1)
-  }
-  guard let obs = request.results as? [VNRecognizedTextObservation]
-  else {
-    fputs("no results\n", stderr)
-    exit(1)
-  }
+func clipboardSource() -> ImageSource? {
+    let pasteboard = NSPasteboard.general
+    let fileURLs = pasteboard.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL] ?? []
 
-  for observation in obs {
-    let top: [VNRecognizedText] = observation.topCandidates(1)
-
-    if let recognizedText: VNRecognizedText = top.first {
-      print(recognizedText.string)
+    if !fileURLs.isEmpty {
+        // Clipboard contains files — only proceed if one is an image.
+        // Do NOT fall through to NSImage: Finder puts the file icon there for any copied file.
+        guard let imageURL = fileURLs.first(where: { imageExts.contains($0.pathExtension.lowercased()) }) else {
+            return nil
+        }
+        fputs("ocr: reading image file from clipboard: \(imageURL.path)\n", stderr)
+        return .url(imageURL)
     }
-  }
+
+    if let images = pasteboard.readObjects(forClasses: [NSImage.self], options: nil) as? [NSImage],
+       let image = images.first {
+        return .nsImage(image)
+    }
+    return nil
 }
-request.recognitionLevel = VNRequestTextRecognitionLevel.accurate
-try? handler.perform([request])
+
+func lastScreenshotSource() -> ImageSource? {
+    let rawPath = UserDefaults(suiteName: "com.apple.screencapture")?.string(forKey: "location") ?? "~/Desktop"
+    let dir = (rawPath as NSString).expandingTildeInPath
+    guard let files = try? FileManager.default.contentsOfDirectory(
+        at: URL(fileURLWithPath: dir),
+        includingPropertiesForKeys: [.contentModificationDateKey],
+        options: .skipsHiddenFiles
+    ) else { return nil }
+    let sorted = files
+        .filter { imageExts.contains($0.pathExtension.lowercased()) }
+        .sorted {
+            let d1 = (try? $0.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast
+            let d2 = (try? $1.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast
+            return d1 > d2
+        }
+    guard let latest = sorted.first else { return nil }
+    fputs("ocr: reading last screenshot: \(latest.path)\n", stderr)
+    return .url(latest)
+}
+
+let args = CommandLine.arguments.dropFirst()
+
+if args.contains("-h") || args.contains("--help") {
+    usage(exitCode: 0)
+}
+
+if args.count > 1 {
+    fputs("error: too many arguments\n", stderr)
+    usage()
+}
+
+let explicitSource = args.first
+
+let source: ImageSource
+
+switch explicitSource {
+case "CLIPBOARD":
+    guard let s = clipboardSource() else {
+        fputs("error: no image found in clipboard\n", stderr)
+        exit(1)
+    }
+    source = s
+
+case "LASTSCREENSHOT":
+    guard let s = lastScreenshotSource() else {
+        fputs("error: no screenshots found\n", stderr)
+        exit(1)
+    }
+    source = s
+
+case nil:
+    if let s = clipboardSource() {
+        fputs("ocr: source: clipboard\n", stderr)
+        source = s
+    } else if let s = lastScreenshotSource() {
+        fputs("ocr: clipboard has no image, using last screenshot\n", stderr)
+        source = s
+    } else {
+        fputs("error: no image in clipboard and no screenshots found\n", stderr)
+        exit(1)
+    }
+
+default:
+    let path = explicitSource!
+    guard FileManager.default.fileExists(atPath: path) else {
+        fputs("error: file not found: \(path)\n", stderr)
+        exit(1)
+    }
+    fputs("ocr: reading file: \(path)\n", stderr)
+    source = .url(URL(fileURLWithPath: path))
+}
+
+fputs("ocr: recognizing text...\n", stderr)
+
+let app = NSApplication.shared
+app.setActivationPolicy(.prohibited)
+
+Task {
+    defer { app.terminate(nil) }
+
+    guard ImageAnalyzer.isSupported else {
+        fputs("error: Live Text not supported on this machine\n", stderr)
+        exit(1)
+    }
+
+    let analyzer = ImageAnalyzer()
+    let config = ImageAnalyzer.Configuration([.text])
+
+    do {
+        let analysis: ImageAnalysis
+        switch source {
+        case .url(let url):
+            analysis = try await analyzer.analyze(imageAt: url, orientation: .up, configuration: config)
+        case .nsImage(let image):
+            analysis = try await analyzer.analyze(image, orientation: .up, configuration: config)
+        }
+        print(analysis.transcript)
+    } catch {
+        fputs("error: \(error)\n", stderr)
+        exit(1)
+    }
+}
+
+app.run()
