@@ -1,0 +1,78 @@
+#!/usr/bin/env python
+import argparse
+from inspect import cleandoc
+import subprocess
+import sys
+
+
+def get_main_branch():
+    for branch in ('main', 'master'):
+        result = subprocess.run(['git', 'rev-parse', '--verify', branch], capture_output=True)
+        if result.returncode == 0:
+            return branch
+    return 'main'
+
+
+def main():
+    parser = argparse.ArgumentParser(description='Summarize recent git commits that diverge from the main branch')
+    parser.add_argument('--start', default=None, help='The branch to compare against')
+    parser.add_argument('--end', default='HEAD', help='The branch or commit to compare from')
+    args = parser.parse_args()
+    args.prompt = cleandoc("""
+    summarize the following git commits into a single title and multiple description items:
+
+    for the title and the description items:
+      - ALWAYS use passive voice in writing the title and description
+      - ALWAYS keep comments concise, but specfic
+      - NEVER include the path of the changed files in the title or description
+      - ALWAYS be specfic
+      - ALWAYS output only the title and description
+      - ALWAYS summarize all commits into one title
+      - ALWAYS generate a description item for each commit
+      - ALWAYS output description items in one sentence, approximately 40 to 100 characters
+      - ALWAYS describe where changes took place like the frontend or backend code
+      - NEVER make descriptions fancy or use big words
+      - NEVER include file names in descriptions
+      - NEVER output descriptions like: "Backend code in `react/src/lib/constants` updated."
+      - NEVER use the following banned words (any form of the following word):
+          - enhance
+          - improved
+          - refactor
+      - ALWAYS output one title (description items have no title)
+      - ALWAYS output description items
+    """)
+
+    current_branch = subprocess.check_output(['git', 'rev-parse', '--abbrev-ref', 'HEAD']).decode('utf-8').strip()
+    main_branch = get_main_branch()
+
+    uncommitted = subprocess.check_output(['git', 'diff', 'HEAD']).decode('utf-8')
+    uncommitted_files = subprocess.check_output(['git', 'diff', 'HEAD', '--name-only']).decode('utf-8').strip()
+
+    if current_branch in ('main', 'master') and args.start is None:
+        commits = uncommitted
+        changed_files = uncommitted_files
+    else:
+        base = args.start or main_branch
+        merge_base = subprocess.check_output(['git', 'merge-base', base, args.end]).decode('utf-8').strip()
+        commits = subprocess.check_output(['git', 'log', f'{merge_base}..{args.end}', '--patch']).decode('utf-8')
+        commits += uncommitted
+        committed_files = subprocess.check_output(['git', 'diff', '--name-only', merge_base, args.end]).decode('utf-8').strip()
+        all_files = dict.fromkeys(filter(None, committed_files.splitlines() + uncommitted_files.splitlines()))
+        changed_files = '\n'.join(all_files)
+
+    print(changed_files, file=sys.stderr)
+
+    result = subprocess.run(["apfel", f"{args.prompt}\n{commits}"], capture_output=True)
+    if result.returncode != 0:
+        print(result.stderr.decode('utf-8'), file=sys.stderr)
+        sys.exit(result.returncode)
+
+    print(result.stdout.decode('utf-8'))
+
+if __name__ == "__main__":
+    main()
+
+
+
+
+

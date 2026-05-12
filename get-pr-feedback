@@ -1,0 +1,130 @@
+#!/usr/bin/env python3
+"""Fetch GitHub Copilot review comments on a PR for the current repo."""
+
+import subprocess
+import json
+import sys
+import argparse
+import textwrap
+
+COPILOT_LOGINS = {"copilot[bot]", "github-copilot[bot]", "copilot-pull-request-reviewer[bot]"}
+
+
+def gh(*args):
+    result = subprocess.run(["gh"] + list(args), capture_output=True, text=True)
+    if result.returncode != 0:
+        print(f"gh error: {result.stderr.strip()}", file=sys.stderr)
+        sys.exit(1)
+    return result.stdout.strip()
+
+
+def gh_json(*args):
+    return json.loads(gh(*args))
+
+
+def is_copilot(login):
+    return login in COPILOT_LOGINS or "copilot" in login.lower()
+
+
+def get_pr_number(pr_arg):
+    if pr_arg:
+        return int(pr_arg)
+    try:
+        return gh_json("pr", "view", "--json", "number")["number"]
+    except SystemExit:
+        print("No open PR for current branch. Pass a PR number with -p <number>.", file=sys.stderr)
+        sys.exit(1)
+
+
+def paginate(endpoint):
+    """Fetch all pages from a gh api endpoint."""
+    results = []
+    page = 1
+    while True:
+        batch = gh_json("api", f"{endpoint}?per_page=100&page={page}")
+        if not batch:
+            break
+        results.extend(batch)
+        if len(batch) < 100:
+            break
+        page += 1
+    return results
+
+
+def print_section(title):
+    print(f"\n{'=' * 60}")
+    print(f"  {title}")
+    print('=' * 60)
+
+
+def wrap(text, indent=4):
+    prefix = " " * indent
+    return textwrap.fill(text, width=100, initial_indent=prefix, subsequent_indent=prefix)
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Show GitHub Copilot review feedback on a PR")
+    parser.add_argument("-p", "--pr", metavar="NUMBER", help="PR number (default: current branch's PR)")
+    parser.add_argument("--all", action="store_true", help="Show all reviewers, not just Copilot")
+    args = parser.parse_args()
+
+    repo = gh_json("repo", "view", "--json", "nameWithOwner")["nameWithOwner"]
+    pr_number = get_pr_number(args.pr)
+
+    print(f"Repo: {repo}  |  PR: #{pr_number}")
+
+    base = f"repos/{repo}/pulls/{pr_number}"
+
+    reviews = paginate(f"{base}/reviews")
+    inline_comments = paginate(f"{base}/comments")
+    issue_comments = paginate(f"repos/{repo}/issues/{pr_number}/comments")
+
+    filter_fn = (lambda u: True) if args.all else is_copilot
+
+    copilot_reviews = [r for r in reviews if filter_fn(r["user"]["login"])]
+    copilot_inline = [c for c in inline_comments if filter_fn(c["user"]["login"])]
+    copilot_issue = [c for c in issue_comments if filter_fn(c["user"]["login"])]
+
+    if not any([copilot_reviews, copilot_inline, copilot_issue]):
+        print("\nNo Copilot feedback found on this PR.")
+        reviewers = {r["user"]["login"] for r in reviews}
+        reviewers |= {c["user"]["login"] for c in inline_comments}
+        if reviewers:
+            print(f"Reviewers present: {', '.join(sorted(reviewers))}")
+        return
+
+    # PR-level reviews (summary + state)
+    if copilot_reviews:
+        print_section(f"PR Reviews ({len(copilot_reviews)})")
+        for r in copilot_reviews:
+            state = r.get("state", "")
+            submitted = r.get("submitted_at", "")[:10]
+            body = r.get("body", "").strip()
+            print(f"\n  [{state}] by {r['user']['login']} on {submitted}")
+            if body:
+                print(wrap(body))
+
+    # Inline review comments (attached to specific lines)
+    if copilot_inline:
+        print_section(f"Inline Comments ({len(copilot_inline)})")
+        for c in sorted(copilot_inline, key=lambda x: (x.get("path", ""), x.get("line") or 0)):
+            path = c.get("path", "")
+            line = c.get("line") or c.get("original_line") or "?"
+            body = c.get("body", "").strip()
+            print(f"\n  {path}:{line}")
+            print(wrap(body))
+
+    # Issue-level comments (general PR comments)
+    if copilot_issue:
+        print_section(f"General Comments ({len(copilot_issue)})")
+        for c in copilot_issue:
+            created = c.get("created_at", "")[:10]
+            body = c.get("body", "").strip()
+            print(f"\n  {c['user']['login']} on {created}")
+            print(wrap(body))
+
+    print()
+
+
+if __name__ == "__main__":
+    main()
