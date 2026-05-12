@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import argparse
+from dataclasses import dataclass
 import hashlib
 import os
 import pathlib
@@ -9,6 +10,17 @@ import subprocess
 import sys
 
 import requests
+
+
+@dataclass
+class TestFailure:
+    type: str
+    file: str
+    name: str
+
+    @property
+    def location(self) -> str:
+        return f"{self.file}::{self.name}"
 
 CACHE_ROOT = pathlib.Path("/tmp/get-ci-errors")
 SCRIPT_SHA_FILE = CACHE_ROOT / "script.sha"
@@ -82,7 +94,13 @@ def find_pipeline(project_slug, branch, token):
     return items[0]
 
 
-def collect_failures(project_slug, pipeline_id, circle_token):
+def collect_failures(project_slug, pipeline_id, circle_token, cache_key):
+    cached = CACHE_ROOT / cache_key / "failures"
+    if cached.exists():
+        print("(cached)", file=sys.stderr)
+        lines = cached.read_text().splitlines()
+        return [TestFailure(*line.split("\t", 2)) for line in lines if line]
+
     workflows = circle_get(f"/pipeline/{pipeline_id}/workflow", circle_token).get("items", [])
     failures = []
     for workflow in workflows:
@@ -97,12 +115,12 @@ def collect_failures(project_slug, pipeline_id, circle_token):
                 continue
             for test in tests:
                 if test.get("result") == "failure":
-                    failures.append((job["name"], test))
+                    file_ = test.get("file", "") or test.get("classname", "")
+                    failures.append(TestFailure(type="python", file=file_, name=test.get("name", "")))
+
+    cached.parent.mkdir(parents=True, exist_ok=True)
+    cached.write_text("\n".join(f"{f.type}\t{f.file}\t{f.name}" for f in failures) + "\n" if failures else "")
     return failures
-
-
-def cache_path(repo, branch, sha):
-    return CACHE_ROOT / repo / branch / sha / "failures"
 
 
 def script_changed():
@@ -120,6 +138,7 @@ def main():
     parser.add_argument("--circle-token", default=os.environ.get("CIRCLE_TOKEN"), help="CircleCI API token (or set CIRCLE_TOKEN)")
     parser.add_argument("--github-token", help="GitHub API token (or set GITHUB_TOKEN, or relies on gh CLI)")
     parser.add_argument("--clear-cache", action="store_true", default=changed, help="Clear all cached results (default: true when script has changed)")
+    parser.add_argument("--only-files", action="store_true", help="Only output unique filenames, not individual test names")
     args = parser.parse_args()
 
     if not args.circle_token:
@@ -138,41 +157,28 @@ def main():
     CACHE_ROOT.mkdir(parents=True, exist_ok=True)
     SCRIPT_SHA_FILE.write_text(current_sha)
 
-    cached = cache_path(repo, branch, sha)
-    if cached.exists():
-        print("(cached)", file=sys.stderr)
-        content = cached.read_text()
-        if content:
-            sys.stdout.write(content)
-        else:
-            print("No test failures found.", file=sys.stderr)
-        return
-
     pr = find_pr(repo, branch, token)
     print(f"PR #{pr['number']}: {pr['title']}", file=sys.stderr)
 
     pipeline = find_pipeline(project_slug, branch, args.circle_token)
     print(f"Pipeline #{pipeline['number']} ({pipeline['id']})", file=sys.stderr)
 
-    failures = collect_failures(project_slug, pipeline["id"], args.circle_token)
+    cache_key = f"{repo}/{branch}/{sha}"
+    failures = collect_failures(project_slug, pipeline["id"], args.circle_token, cache_key)
 
-    lines = []
-    for job_name, test in failures:
-        file_ = test.get("file", "")
-        classname = test.get("classname", "")
-        name = test.get("name", "")
-        location = file_ or classname
-        lines.append(f"{location}::{name}")
-
-    cached.parent.mkdir(parents=True, exist_ok=True)
-    cached.write_text("\n".join(lines) + "\n" if lines else "")
-
-    if not lines:
+    if not failures:
         print("No test failures found.", file=sys.stderr)
         return
 
-    for line in lines:
-        print(line)
+    if args.only_files:
+        seen = set()
+        for f in failures:
+            if f.file not in seen:
+                seen.add(f.file)
+                print(f.file)
+    else:
+        for f in failures:
+            print(f.location)
 
 
 if __name__ == "__main__":
