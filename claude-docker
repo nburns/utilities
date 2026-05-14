@@ -1,0 +1,152 @@
+#!/usr/bin/env python3
+"""Run Claude Code in an isolated Docker container.
+
+Usage: claude-docker [-r] [-d] [-k] [-i IMAGE] [host:container ...] [-- claude_args...]
+
+  Current dir is always mounted at /workspace.
+  Extra mounts: /host/path:/container/path  or  /path (mounted at same path).
+  Auth is forwarded via ANTHROPIC_API_KEY or ~/.claude mount.
+
+Options:
+  -r          Rebuild the Docker image
+  -d          Mount host Docker socket (run docker commands inside)
+  -k          Keep the image after exit (default: remove it)
+  -i IMAGE    Image name to build/use (default: claude-code)
+"""
+
+import argparse
+import os
+import subprocess
+import sys
+import time
+
+IMAGE_DEFAULT = "claude-code"
+
+DOCKERFILE = """\
+FROM node:22-slim
+RUN apt-get update \\
+    && apt-get install -y git curl ca-certificates gnupg \\
+    && install -m 0755 -d /etc/apt/keyrings \\
+    && curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg \\
+    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian bookworm stable" > /etc/apt/sources.list.d/docker.list \\
+    && apt-get update \\
+    && apt-get install -y docker-ce-cli \\
+    && rm -rf /var/lib/apt/lists/*
+RUN npm install -g @anthropic-ai/claude-code
+WORKDIR /workspace
+ENTRYPOINT ["claude"]
+"""
+
+
+def image_exists(image):
+    return subprocess.run(
+        ["docker", "image", "inspect", image],
+        capture_output=True,
+    ).returncode == 0
+
+
+def build_image(image):
+    print(f"Building Docker image {image}...", file=sys.stderr)
+    subprocess.run(
+        ["docker", "build", "-t", image, "-"],
+        input=DOCKERFILE.encode(),
+        check=True,
+    )
+
+
+def snapshot_images():
+    result = subprocess.run(["docker", "images", "-q"], capture_output=True, text=True)
+    return set(result.stdout.split())
+
+
+def containers_created_since(since):
+    result = subprocess.run(
+        ["docker", "events",
+         "--since", str(int(since)), "--until", "now",
+         "--filter", "type=container", "--filter", "event=create",
+         "--format", "{{.Actor.ID}}"],
+        capture_output=True, text=True,
+    )
+    return [c for c in result.stdout.splitlines() if c]
+
+
+def reset_terminal():
+    subprocess.run(["stty", "sane"], capture_output=True)
+    print("\r", end="", flush=True)
+
+
+def cleanup(before_images, session_start):
+    reset_terminal()
+    print("Cleaning up...", file=sys.stderr)
+
+    containers = containers_created_since(session_start)
+    if containers:
+        subprocess.run(["docker", "stop", *containers], capture_output=True)
+        subprocess.run(["docker", "rm", *containers], capture_output=True)
+
+    after_images = snapshot_images()
+    new_ids = after_images - before_images
+    if new_ids:
+        subprocess.run(["docker", "rmi", *new_ids], capture_output=True)
+
+
+def main():
+    argv = sys.argv[1:]
+    if "--" in argv:
+        sep = argv.index("--")
+        our_args, claude_args = argv[:sep], argv[sep + 1:]
+    else:
+        our_args, claude_args = argv, []
+
+    parser = argparse.ArgumentParser(
+        description=__doc__,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parser.add_argument("-r", action="store_true", dest="rebuild", help="Rebuild the Docker image")
+    parser.add_argument("-d", action="store_true", dest="docker_socket", help="Mount host Docker socket")
+    parser.add_argument("-k", action="store_true", dest="keep", help="Keep images after exit")
+    parser.add_argument("-i", default=IMAGE_DEFAULT, dest="image", metavar="IMAGE", help="Image name")
+    parser.add_argument("mounts", nargs="*", help="Extra mounts: host:container or /path")
+    args = parser.parse_args(our_args)
+
+    before = snapshot_images()
+    session_start = time.time()
+
+    if args.rebuild or not image_exists(args.image):
+        build_image(args.image)
+
+    cmd = ["docker", "run", "--rm", "-it"]
+
+    if api_key := os.environ.get("ANTHROPIC_API_KEY"):
+        cmd += ["-e", f"ANTHROPIC_API_KEY={api_key}"]
+
+    if os.path.isfile(claude_json := os.path.expanduser("~/.claude.json")):
+        cmd += ["-v", f"{claude_json}:/root/.claude.json"]
+
+    if os.path.isdir(claude_dir := os.path.expanduser("~/.claude")):
+        cmd += ["-v", f"{claude_dir}:/root/.claude"]
+
+    if os.path.isfile(gitconfig := os.path.expanduser("~/.gitconfig")):
+        cmd += ["-v", f"{gitconfig}:/root/.gitconfig:ro"]
+
+    if args.docker_socket:
+        cmd += ["-v", "/var/run/docker.sock:/var/run/docker.sock"]
+
+    cmd += ["-v", f"{os.getcwd()}:/workspace", "-w", "/workspace"]
+
+    for mount in args.mounts:
+        cmd += ["-v", mount if ":" in mount else f"{mount}:{mount}"]
+
+    cmd += [args.image, *claude_args]
+
+    try:
+        proc = subprocess.run(cmd)
+    finally:
+        if not args.keep:
+            cleanup(before, session_start)
+
+    sys.exit(proc.returncode)
+
+
+if __name__ == "__main__":
+    main()
