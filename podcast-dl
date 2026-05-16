@@ -1,0 +1,216 @@
+#!/usr/bin/env python3
+"""Download N most recent episodes for each podcast in ~/.castgetrc."""
+
+import argparse
+import configparser
+import os
+import re
+import sys
+import threading
+import xml.etree.ElementTree as ET
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from email.utils import parsedate_to_datetime
+from pathlib import Path
+from urllib.request import urlopen, Request
+from urllib.error import URLError
+
+CHUNK = 65536
+USER_AGENT = "Mozilla/5.0 (compatible; podcast-dl/1.0)"
+_print_lock = threading.Lock()
+
+
+def log(msg):
+    with _print_lock:
+        print(msg)
+
+
+def parse_castgetrc(path):
+    cfg = configparser.RawConfigParser()
+    cfg.read(path)
+    return cfg
+
+
+def sanitize(name):
+    name = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "", name)
+    return name.strip()
+
+
+def apply_template(template, date, title):
+    result = template.replace("%(date)", date).replace("%(title)", title)
+    return result
+
+
+def fetch(url, timeout=30):
+    req = Request(url, headers={"User-Agent": USER_AGENT})
+    with urlopen(req, timeout=timeout) as resp:
+        return resp.read()
+
+
+def parse_date(text):
+    try:
+        return parsedate_to_datetime(text.strip()).strftime("%Y-%m-%d")
+    except Exception:
+        return "unknown"
+
+
+def get_episodes(xml_bytes, n):
+    root = ET.fromstring(xml_bytes)
+    channel = root.find("channel")
+    if channel is None:
+        return []
+
+    episodes = []
+    for item in channel.findall("item")[:n]:
+        enclosure = item.find("enclosure")
+        if enclosure is None:
+            continue
+        url = enclosure.get("url", "")
+        if not url:
+            continue
+
+        title_el = item.find("title")
+        title = title_el.text.strip() if title_el is not None and title_el.text else "Unknown"
+
+        pubdate_el = item.find("pubDate")
+        date = parse_date(pubdate_el.text) if pubdate_el is not None and pubdate_el.text else "unknown"
+
+        episodes.append({"url": url, "title": title, "date": date})
+
+    return episodes
+
+
+def download(url, dest, label):
+    req = Request(url, headers={"User-Agent": USER_AGENT})
+    tmp = dest + ".part"
+    filename = os.path.basename(dest)
+    log(f"{label} → {filename}")
+    try:
+        with urlopen(req, timeout=120) as resp, open(tmp, "wb") as f:
+            total = int(resp.headers.get("Content-Length", 0))
+            done = 0
+            last_milestone = -1
+            last_mb_reported = 0
+            while chunk := resp.read(CHUNK):
+                f.write(chunk)
+                done += len(chunk)
+                if total:
+                    milestone = (done * 100 // total) // 25 * 25  # 0, 25, 50, 75
+                    if milestone > last_milestone:
+                        last_milestone = milestone
+                        if milestone > 0:
+                            log(f"{label} {milestone:3d}% {filename}")
+                else:
+                    mb = done // (1024 * 1024)
+                    if mb > last_mb_reported and mb % 10 == 0:
+                        last_mb_reported = mb
+                        log(f"{label} {mb} MB {filename}")
+        os.rename(tmp, dest)
+        log(f"{label} done {filename}")
+    except Exception:
+        if os.path.exists(tmp):
+            os.unlink(tmp)
+        raise
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Download podcast episodes from castgetrc")
+    parser.add_argument("-n", "--count", type=int, default=3, metavar="N",
+                        help="episodes to download per podcast (default: 3)")
+    parser.add_argument("-j", "--jobs", type=int, default=4, metavar="J",
+                        help="parallel downloads (default: 4)")
+    parser.add_argument("-c", "--config", default="~/.castgetrc", metavar="FILE")
+    parser.add_argument("--dry-run", action="store_true", help="show what would be downloaded")
+    parser.add_argument("podcasts", nargs="*", help="limit to these podcast names")
+    args = parser.parse_args()
+
+    cfg = parse_castgetrc(os.path.expanduser(args.config))
+
+    global_filename = "%(date) - %(title).mp3"
+    if cfg.has_section("*"):
+        global_filename = cfg.get("*", "filename", fallback=global_filename)
+
+    podcasts = []
+    for section in cfg.sections():
+        if section == "*":
+            continue
+        if args.podcasts and section not in args.podcasts:
+            continue
+        url = cfg.get(section, "url", fallback=None)
+        spool = cfg.get(section, "spool", fallback=None)
+        if not url or not spool:
+            log(f"[{section}] missing url or spool — skipping")
+            continue
+        podcasts.append({
+            "name": section,
+            "url": url,
+            "spool": os.path.expanduser(spool),
+            "template": cfg.get(section, "filename", fallback=global_filename),
+        })
+
+    errors = []
+    tasks = []  # (name, ep_url, dest, filename)
+
+    # Fetch all feeds in parallel
+    with ThreadPoolExecutor(max_workers=args.jobs) as pool:
+        feed_futures = {pool.submit(fetch, p["url"]): p for p in podcasts}
+        for future in as_completed(feed_futures):
+            p = feed_futures[future]
+            name = p["name"]
+            try:
+                xml_bytes = future.result()
+            except Exception as e:
+                log(f"[{name}] feed error: {e}")
+                errors.append(f"{name}: {e}")
+                continue
+
+            try:
+                episodes = get_episodes(xml_bytes, args.count)
+            except ET.ParseError as e:
+                log(f"[{name}] XML parse error: {e}")
+                errors.append(f"{name}: {e}")
+                continue
+
+            if not episodes:
+                log(f"[{name}] no episodes with enclosures found")
+                continue
+
+            os.makedirs(p["spool"], exist_ok=True)
+
+            for ep in episodes:
+                filename = apply_template(p["template"], ep["date"], sanitize(ep["title"]))
+                dest = os.path.join(p["spool"], filename)
+                if os.path.exists(dest):
+                    log(f"[{name}] exists  {filename}")
+                elif args.dry_run:
+                    log(f"[{name}] would dl {filename}")
+                else:
+                    tasks.append((name, ep["url"], dest, filename))
+
+    if not tasks:
+        if errors:
+            print(f"\n{len(errors)} error(s):")
+            for e in errors:
+                print(f"  {e}")
+            sys.exit(1)
+        return
+
+    # Download in parallel
+    with ThreadPoolExecutor(max_workers=args.jobs) as pool:
+        dl_futures = {pool.submit(download, t[1], t[2], f"[{t[0]}]"): t for t in tasks}
+        for future in as_completed(dl_futures):
+            name, ep_url, dest, filename = dl_futures[future]
+            try:
+                future.result()
+            except Exception as e:
+                log(f"[{name}] failed: {e}")
+                errors.append(f"{name}/{filename}: {e}")
+
+    if errors:
+        print(f"\n{len(errors)} error(s):")
+        for e in errors:
+            print(f"  {e}")
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()

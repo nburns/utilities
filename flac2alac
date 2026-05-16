@@ -3,52 +3,123 @@ import argparse
 import os
 import re
 import subprocess
+from dataclasses import dataclass
+
+
+@dataclass
+class TaggedFile:
+    track: str
+    album: str
+    artist: str
+    tracknum: int
+    total_tracknums: int
+    year: int
+    genre: str
+    disk: int
+    disks: int
+    cover_file: str
+    input_file: str
+    output_file: str
+    final_dir: str
+
+    def convert(self):
+        return [
+            "ffmpeg",
+            "-vn",
+            "-y",
+            "-i",
+            self.input_file,
+            "-acodec",
+            "alac",
+            self.output_file,
+        ]
+
+    def tag(self):
+        return [
+            "AtomicParsley",
+            self.output_file,
+            "--artwork",
+            self.cover_file,
+            "--artist",
+            self.artist,
+            "--album",
+            self.album,
+            "--title",
+            self.track,
+            "--tracknum",
+            f"{self.tracknum}/{self.total_tracknums}",
+            "--year",
+            self.year,
+            "--genre",
+            self.genre,
+            "--disk",
+            f"{self.disk}/{self.disks}",
+            "--overWrite",
+        ]
+
+    def move(self):
+        return ["mv", self.output_file, self.final_dir]
+
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--artist', required=True)
-    parser.add_argument('--album', required=True)
-    parser.add_argument('--cover', required=True)
-    parser.add_argument('--year', required=True)
-    parser.add_argument('--genre', required=True)
-    parser.add_argument('--location', default=os.getcwd())
-    parser.add_argument('--dry-run', default=False, action='store_true')
+    parser.add_argument("--artist", required=True)
+    parser.add_argument("--album", required=True)
+    parser.add_argument("--cover", required=True)
+    parser.add_argument("--year", required=True)
+    parser.add_argument("--genre", required=True)
+    parser.add_argument("--disk", default=1, type=int)
+    parser.add_argument("--disks", default=1, type=int)
+    parser.add_argument("--location", default=os.getcwd())
+    parser.add_argument("--dry-run", default=False, action="store_true")
     args = parser.parse_args()
-    args.files = sorted(f for f in os.listdir(args.location) if f.lower().endswith('flac'))
+    args.files = sorted(
+        f for f in os.listdir(args.location) if f.lower().endswith("flac")
+    )
 
-    digits = '\d+[ -.]+'
-
-    argvs = []
     total = len(args.files)
-    argvs.append(['mkdir', '-p', args.album])
+
+    files = []
     for idx, file in enumerate(args.files, start=1):
-        out = re.sub(digits, f'{str(idx).zfill(2)} ', re.sub('flac$', 'm4a', file, flags=re.I))
+        out = re.sub(
+            "^\d+[ -.]+",
+            f"{str(idx).zfill(2)} ",
+            re.sub("flac$", "m4a", file, flags=re.I),
+        )
         assert str(idx) in out
 
-        track = re.sub('\d+[ -.]+', '', re.sub('.m4a', '', os.path.basename(out)))
-        argvs.append([ "ffmpeg", '-vn', '-y', "-i", file, "-acodec", "alac", out ])
+        files.append(
+            TaggedFile(
+                track=re.sub(
+                    "^\d+[ -.]+", "", re.sub(".m4a", "", os.path.basename(out))
+                ),
+                album=args.album,
+                artist=args.artist,
+                tracknum=idx,
+                total_tracknums=total,
+                year=args.year,
+                genre=args.genre,
+                disk=args.disk,
+                disks=args.disks,
+                cover_file=args.cover,
+                input_file=file,
+                output_file=out,
+                final_dir=args.album,
+            )
+        )
 
-        argvs.append([
-            'AtomicParsley', out,
-            '--artwork', args.cover,
-            '--artist', args.artist,
-            '--album', args.album,
-            '--title', track,
-            '--tracknum', f'{idx}/{total}',
-            '--year', args.year,
-            '--genre', args.genre,
-            '--overWrite'
-        ])
-
-        argvs.append(['mv', out, args.album])
+    argvs = [["mkdir", "-p", args.album]]
+    for file in files:
+        argvs.extend([file.convert(), file.tag(), file.move()])
 
     for argv in argvs:
         if args.dry_run:
-            print(' '.join(argv))
+            print(" ".join(argv))
         else:
             subprocess.check_output(
-                argv, env=(os.environ | {'PIC_OPTIONS': 'removeTempPix'}))
+                argv, env=(os.environ | {"PIC_OPTIONS": "removeTempPix"})
+            )
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

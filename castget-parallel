@@ -1,0 +1,27 @@
+#!/bin/bash
+# Run castget downloads in parallel across all channels, capped at 20 episodes per channel
+set -euo pipefail
+
+RCFILE="${CASTGET_RCFILE:-$HOME/.castgetrc}"
+JOBS="${CASTGET_JOBS:-6}"
+LIMIT="${CASTGET_LIMIT:-20}"
+
+channels=$(grep '^\[' "$RCFILE" | grep -v '^\[\*\]' | sed 's/^\[//;s/\]$//')
+
+download_channel() {
+    local channel="$1"
+    local limit="$2"
+    local downloaded=0
+    for ((i=0; i<limit; i++)); do
+        local output
+        output=$(castget "$channel" --first-only 2>/dev/null)
+        # castget prints only "Listing channel..." (1 line) when nothing to download
+        [[ $(printf '%s\n' "$output" | wc -l) -lt 2 ]] && break
+        echo "[$channel] episode $((downloaded+1))"
+        ((downloaded++))
+    done
+    echo "[$channel] done ($downloaded episodes)"
+}
+export -f download_channel
+
+echo "$channels" | parallel -j"$JOBS" --line-buffer download_channel {} "$LIMIT"

@@ -1,0 +1,50 @@
+#!/usr/bin/env python
+import os
+import requests
+from urllib.parse import quote_plus
+
+headers = {
+        "User-Agent": "Nicks album id tool"
+        }
+
+def artist_id(base):
+    response = requests.get(f"https://musicbrainz.org/ws/2/artist/?fmt=json&query={quote_plus(base)}", headers=headers)
+    response.raise_for_status()
+
+    artists = response.json()["artists"][0:5]
+    for idx, a in enumerate(artists):
+        print(f"{idx}) {a['name']}")
+
+    idx = int(input("which artist? "))
+
+    return artists[idx]['id']
+
+def release_group_id(base, artist_id):
+    response = requests.get(f"https://musicbrainz.org/ws/2/release-group/?fmt=json&query={quote_plus(base)}", headers=headers)
+    response.raise_for_status()
+
+    groups = response.json()["release-groups"][0:5]
+    for idx, a in enumerate(groups):
+        breakpoint()
+        print(f"{idx}) {a['title']} {a['first-release-date']}")
+
+    idx = int(input("which release group? "))
+    return groups[idx]['id']
+
+
+
+
+
+
+
+def detect_album(base):
+    artist = artist_id(base)
+    release_group = release_group_id(base, artist_id)
+    return base
+
+def main():
+    print(detect_album(os.getcwd()))
+
+
+if __name__ == '__main__':
+    main()
