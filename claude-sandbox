@@ -1,0 +1,283 @@
+#!/usr/bin/env bash
+#
+# claude-sandbox — run Claude Code inside a macOS Seatbelt profile.
+#
+# What this protects against:
+#   - Reads/writes outside the project directory (SSH keys, AWS creds, GPG,
+#     password-store, gh/gcloud/op/1Password tokens, npmrc, kube/docker,
+#     browser cookies, Mail, Messages — all denied).
+#   - ssh-agent socket access (SSH_AUTH_SOCK unset; com.apple.launchd dirs
+#     unreachable in /private/tmp).
+#   - Keychain access via securityd IPC (mach-lookup deny on SecurityServer).
+#   - Raw disk device reads, sysctl writes.
+#
+# What it does NOT protect against:
+#   - Outbound network to arbitrary hosts (Seatbelt cannot filter by hostname).
+#   - stat() metadata of any path (file-read-metadata is global; required by dyld).
+#
+# ----- One-time setup -------------------------------------------------------
+#
+# Claude auth is bootstrapped from the macOS Keychain into the sandbox via the
+# CLAUDE_CODE_OAUTH_TOKEN env var, so that inside the sandbox we can deny both
+# Keychain file reads and securityd IPC.
+#
+#   1. Generate a long-lived OAuth token (requires Claude subscription):
+#        claude setup-token
+#
+#   2. Store it in your real Keychain under service name "claude-code-oauth":
+#        security add-generic-password -a "$USER" -s claude-code-oauth -w 'PASTE_TOKEN'
+#
+#   3. Verify the wrapper picks it up — auth status should report oauth_token:
+#        ~/bin/claude-sandbox -p 'true'
+#        # claude auth status from outside the sandbox: still claude.ai (Keychain)
+#        # inside the wrapper: outermost claude auths via env var
+#
+# To rotate the token later: rerun setup-token, then
+#   security delete-generic-password -s claude-code-oauth -a "$USER"
+#   security add-generic-password   -a "$USER" -s claude-code-oauth -w 'NEW_TOKEN'
+#
+# Note: editing SBPL inside the heredoc — bash interpolates the string, so
+# $variables, backticks, and unescaped double quotes in the SBPL body are all
+# evaluated by bash before sandbox-exec sees them. Stray unescaped double
+# quotes break the string literal; backticks run subshells. Stick to single-
+# character apostrophes for SBPL comments and avoid backticks in the body.
+#
+# ---------------------------------------------------------------------------
+
+WORK_DIR="$(pwd -P)"
+CLAUDE_DIR="$HOME/.claude"
+CLAUDE_JSON="$HOME/.claude.json"
+
+case "$WORK_DIR" in
+  "$HOME"|"$HOME/"|/)
+    echo "claude-sandbox: refusing to run with WORK_DIR=$WORK_DIR" >&2
+    exit 1 ;;
+esac
+
+case "$WORK_DIR" in
+  *[\"\\\$\`]*)
+    echo "claude-sandbox: refusing path with special chars: $WORK_DIR" >&2
+    exit 1 ;;
+esac
+
+case "$HOME" in
+  *[\"\\\$\`]*)
+    echo "claude-sandbox: refusing HOME with special chars: $HOME" >&2
+    exit 1 ;;
+esac
+
+unset SSH_AUTH_SOCK
+
+# Parse -d/--dir (read-only) and -D/--dir-rw (read+write) flags; remaining args pass to claude.
+EXTRA_DIR_RULES=""
+CLAUDE_ARGS=()
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -d|--dir)
+      dir="${2/#\~/$HOME}"; shift 2
+      case "$dir" in *[\"\\\$\`]*) echo "claude-sandbox: skipping dir with special chars: $dir" >&2; continue ;; esac
+      EXTRA_DIR_RULES+="
+(allow file-read*
+  (subpath \"$dir\"))"
+      ;;
+    -D|--dir-rw)
+      dir="${2/#\~/$HOME}"; shift 2
+      case "$dir" in *[\"\\\$\`]*) echo "claude-sandbox: skipping dir with special chars: $dir" >&2; continue ;; esac
+      EXTRA_DIR_RULES+="
+(allow file-read* file-write*
+  (subpath \"$dir\"))"
+      ;;
+    *) CLAUDE_ARGS+=("$1"); shift ;;
+  esac
+done
+set -- "${CLAUDE_ARGS[@]}"
+
+# Fetch Claude OAuth token from the user's real Keychain before entering the sandbox.
+# Inside the sandbox we want to deny securityd / Keychains entirely; bootstrapping
+# the token out here lets Claude auth via env var with no IPC to securityd.
+if token="$(security find-generic-password -s claude-code-oauth -w 2>/dev/null)"; then
+  export CLAUDE_CODE_OAUTH_TOKEN="$token"
+fi
+unset token
+
+exec sandbox-exec -p "
+(version 1)
+(deny default)
+
+;;
+;; System — read-only
+;; /System/Volumes scoped to Preboot/Cryptexes only (dyld shared cache, system libs).
+;; /System/Volumes/Data is intentionally excluded — /Users firmlinks to it on APFS,
+;; so including it would bypass all credential deny rules below.
+;;
+
+(allow file-read*
+  (literal \"/\")
+  (subpath \"/System\")
+  (subpath \"/System/Volumes/Preboot/Cryptexes/OS\")
+  (subpath \"/usr\")
+  (subpath \"/bin\")
+  (subpath \"/sbin\")
+  (subpath \"/Library/Apple\")
+  (subpath \"/Library/Frameworks\")
+  (subpath \"/Library/Managed Preferences\")
+  (subpath \"/Library/Preferences\")
+  (subpath \"/opt/homebrew\")
+  (subpath \"/private/var/db/mds\")
+  (subpath \"/private/var/db/timezone\")
+  (subpath \"/private/etc\")
+  (subpath \"/Applications/Xcode.app/Contents/Developer\")
+  (subpath \"/Library/Developer/CommandLineTools\"))
+
+;; Global metadata allow is required for dyld startup and PATH resolution.
+;; Known limitation: the process can stat() any path (existence, size, mtime)
+;; even outside the read allowlist. Narrowing this breaks tool discovery.
+(allow file-read-metadata)
+
+;;
+;; Devices — no raw disk nodes
+;;
+
+(allow file-read* file-write*
+  (literal \"/dev/null\")
+  (literal \"/dev/random\")
+  (literal \"/dev/urandom\")
+  (literal \"/dev/tty\")
+  (literal \"/dev/ptmx\")
+  (subpath \"/dev/fd\"))
+
+;;
+;; Claude config and state — read + write
+;;
+
+(allow file-read* file-write*
+  (subpath \"$CLAUDE_DIR\")
+  (literal \"$CLAUDE_JSON\"))
+
+;; Keychain file access intentionally NOT granted — Claude's auth comes from
+;; CLAUDE_CODE_OAUTH_TOKEN injected by the wrapper before sandbox-exec.
+
+;;
+;; Project working directory — read + write + exec
+;;
+
+(allow file-read* file-write*
+  (subpath \"$WORK_DIR\"))
+
+(allow process-exec
+  (subpath \"$WORK_DIR\"))
+
+;;
+;; Temp storage — scoped to Claude's own /private/tmp dirs (claude-XXXX-cwd, claude-<uid>, etc.)
+;; A broad /private/tmp allow would expose the ssh-agent socket under com.apple.launchd.*.
+;;
+
+(allow file-read* file-write*
+  (regex #\"^/private/tmp/claude-\")
+  (subpath \"/private/var/folders\"))
+
+;;
+;; Home — specific paths needed for tool resolution and shell config
+;;
+
+(allow file-read*
+  (literal \"$HOME\")
+  (literal \"$HOME/.gitconfig\")
+  (literal \"$HOME/.tool-versions\")
+  (subpath \"$HOME/.asdf\")
+  (subpath \"$HOME/.config\")
+  (subpath \"$HOME/.nvm\")
+  (subpath \"$HOME/.local\")
+  (subpath \"$HOME/.bin\")
+  (subpath \"$HOME/bin\"))
+
+;;
+;; Swift Package Manager — cache and config dirs needed for builds
+;;
+
+(allow file-read* file-write*
+  (subpath \"$HOME/.cache/uv\")
+  (subpath \"$HOME/Library/org.swift.swiftpm\")
+  (subpath \"$HOME/Library/Caches/org.swift.swiftpm\"))
+
+;;
+;; Sensitive home paths — denied after the home allows above.
+;; SBPL is last-match-wins, so these denies must come AFTER any broader allows
+;; (such as the subpath \"$HOME/.config\" allow above) to win against them.
+;; Note: mach-lookup is unrestricted so securityd/keychain is still
+;; reachable over IPC regardless of these file-level denies.
+;;
+
+(deny file-read* file-write*
+  (subpath \"$HOME/.ssh\")
+  (subpath \"$HOME/.aws\")
+  (subpath \"$HOME/.gnupg\")
+  (subpath \"$HOME/.password-store\")
+  (subpath \"$HOME/.kube\")
+  (subpath \"$HOME/.docker\")
+  (subpath \"$HOME/.cargo\")
+  (subpath \"$HOME/.config/gh\")
+  (subpath \"$HOME/.config/gcloud\")
+  (subpath \"$HOME/.config/op\")
+  (subpath \"$HOME/.config/1Password\")
+  (literal \"$HOME/.netrc\")
+  (literal \"$HOME/.git-credentials\")
+  (literal \"$HOME/.pypirc\")
+  (literal \"$HOME/.npm-credentials\")
+  (subpath \"$HOME/Library/Cookies\")
+  (subpath \"$HOME/Library/Application Support/Google/Chrome\")
+  (subpath \"$HOME/Library/Application Support/Firefox\")
+  (subpath \"$HOME/Library/Messages\")
+  (subpath \"$HOME/Library/Mail\"))
+
+;;
+;; Network — allow outbound (api.anthropic.com etc.)
+;; Hostname-level filtering requires a Network Extension; not possible in Seatbelt alone.
+;;
+
+(allow network*)
+
+;;
+;; Process execution
+;;
+
+(allow process-exec
+  (subpath \"/usr/bin\")
+  (subpath \"/usr/local/bin\")
+  (subpath \"/usr/sbin\")
+  (subpath \"/bin\")
+  (subpath \"/sbin\")
+  (subpath \"/opt/homebrew/bin\")
+  (subpath \"/opt/homebrew/sbin\")
+  (subpath \"/opt/homebrew/opt\")
+  (subpath \"/opt/homebrew/Cellar\")
+  (subpath \"/opt/homebrew/Caskroom/claude-code\")
+  (subpath \"/Applications/Xcode.app/Contents/Developer\")
+  (subpath \"/Library/Developer/CommandLineTools\")
+  (subpath \"/private/var/folders\")
+  (subpath \"$HOME/.asdf\")
+  (subpath \"$HOME/.nvm\")
+  (subpath \"$HOME/.local\")
+  (subpath \"$HOME/.bin\")
+  (subpath \"$HOME/bin\"))
+
+(allow process-fork)
+(allow process-exec-interpreter)
+(allow signal)
+
+;; mach-lookup broadly allowed (enumerating ~200 needed Mach services is impractical),
+;; but securityd is denied specifically — Claude no longer needs Keychain since
+;; the wrapper injects CLAUDE_CODE_OAUTH_TOKEN from the user-side Keychain pre-sandbox.
+(allow mach-lookup)
+(deny mach-lookup
+  (global-name \"com.apple.SecurityServer\")
+  (global-name \"com.apple.SecurityServer.xpc\")
+  (global-name \"com.apple.securityd\"))
+(allow mach-task-name)
+(allow ipc-posix*)
+(allow sysctl-read)
+(allow iokit-open)
+(allow system-socket)
+(allow file-ioctl)
+$EXTRA_DIR_RULES
+" /opt/homebrew/bin/claude --dangerously-skip-permissions "$@"
