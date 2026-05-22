@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Run Claude Code in an isolated Docker container.
 
-Usage: claude-docker [-r] [-d] [-k] [-i IMAGE] [host:container ...] [-- claude_args...]
+Usage: claude-docker [-r] [-d] [-k] [-u] [-i IMAGE] [host:container ...] [-- claude_args...]
 
   Current dir is always mounted at /workspace.
   Extra mounts: /host/path:/container/path  or  /path (mounted at same path).
@@ -11,6 +11,7 @@ Options:
   -r          Rebuild the Docker image
   -d          Mount host Docker socket (run docker commands inside)
   -k          Keep the image after exit (default: remove it)
+  -u          Unattended mode: skip all permission prompts (safe in Docker sandbox)
   -i IMAGE    Image name to build/use (default: claude-code)
 """
 
@@ -19,6 +20,7 @@ import os
 import subprocess
 import sys
 import time
+from pathlib import Path
 
 IMAGE_DEFAULT = "claude-code"
 
@@ -105,6 +107,7 @@ def main():
     parser.add_argument("-r", action="store_true", dest="rebuild", help="Rebuild the Docker image")
     parser.add_argument("-d", action="store_true", dest="docker_socket", help="Mount host Docker socket")
     parser.add_argument("-k", action="store_true", dest="keep", help="Keep images after exit")
+    parser.add_argument("-u", action="store_true", dest="unattended", help="Unattended mode: skip all permission prompts")
     parser.add_argument("-i", default=IMAGE_DEFAULT, dest="image", metavar="IMAGE", help="Image name")
     parser.add_argument("mounts", nargs="*", help="Extra mounts: host:container or /path")
     args = parser.parse_args(our_args)
@@ -114,6 +117,9 @@ def main():
 
     if args.rebuild or not image_exists(args.image):
         build_image(args.image)
+
+    if args.unattended and "--dangerously-skip-permissions" not in claude_args:
+        claude_args = ["--dangerously-skip-permissions"] + claude_args
 
     cmd = ["docker", "run", "--rm", "-it"]
 
@@ -129,13 +135,33 @@ def main():
     if os.path.isfile(gitconfig := os.path.expanduser("~/.gitconfig")):
         cmd += ["-v", f"{gitconfig}:/root/.gitconfig:ro"]
 
+    cwd = Path(os.getcwd())
+
+    # User-level docs from host home — mounted first so project files can overlay
+    for name in ("CLAUDE.md", "AGENTS.md"):
+        if (f := Path.home() / name).is_file():
+            cmd += ["-v", f"{f}:/root/{name}:ro"]
+
+    # Project docs — mounted individually so they overlay without clobbering
+    # CLAUDE.md / AGENTS.md at home level (project file wins over host home file)
+    for name in ("CLAUDE.md", "AGENTS.md"):
+        if (f := cwd / name).is_file():
+            cmd += ["-v", f"{f}:/root/{name}:ro"]
+
+    # Agent .md files — mounted individually into /root/.claude/agents/ so
+    # project agents merge with host agents rather than replacing the whole dir
+    for agent_file in sorted((cwd / ".claude" / "agents").glob("*.md")):
+        cmd += ["-v", f"{agent_file}:/root/.claude/agents/{agent_file.name}:ro"]
+
     if args.docker_socket:
         cmd += ["-v", "/var/run/docker.sock:/var/run/docker.sock"]
 
-    cmd += ["-v", f"{os.getcwd()}:/workspace", "-w", "/workspace"]
+    cmd += ["-v", f"{cwd}:/workspace", "-w", "/workspace"]
+
 
     for mount in args.mounts:
         cmd += ["-v", mount if ":" in mount else f"{mount}:{mount}"]
+
 
     cmd += [args.image, *claude_args]
 
